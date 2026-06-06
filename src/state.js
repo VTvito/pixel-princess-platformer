@@ -66,3 +66,30 @@ export function resetProgress() {
     // no-op
   }
 }
+
+// --- "Insert Coin" meta-game (Specifiche_Polishing §1) ------------------------
+// The running tab of "debiti": every failure costs 500 Coccoline. Stored under the exact
+// key the spec names ("totaleCoccoline"), initialised to 0 on first read, and read back
+// for the finale receipt (§2). The debt is deliberately cumulative across the whole gift
+// (a bigger number is the joke), so it is NOT cleared by resetProgress / "Nuova partita".
+const COCCOLINE_KEY = "totaleCoccoline";
+
+export function getCoccoline() {
+  const n = parseInt(read(COCCOLINE_KEY) || "0", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+export function addCoccoline(amount) {
+  const total = getCoccoline() + amount;
+  write(COCCOLINE_KEY, String(total));
+  return total;
+}
+
+// Reset the debt (testing / dev only — not wired to any in-game button).
+export function resetCoccoline() {
+  try {
+    window.localStorage.removeItem(COCCOLINE_KEY);
+  } catch {
+    // no-op
+  }
+}

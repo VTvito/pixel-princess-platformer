@@ -6,7 +6,9 @@
   "scripts": {
     "serve": "python tools/serve.py 8137",
     "test": "node tools/test/smoke.mjs",
-    "test:smoke": "node tools/test/smoke.mjs"
+    "test:smoke": "node tools/test/smoke.mjs",
+    "test:features": "node tools/test/features.mjs",
+    "test:all": "node tools/test/smoke.mjs && node tools/test/features.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.60.0"

@@ -15,11 +15,15 @@ import {
   unlockedSkinKeys,
   skinUnlockedBy,
 } from "../config.js";
-import { getSelectedCharacter, getCurrentLevel, setCurrentLevel } from "../state.js";
+import { getSelectedCharacter, getCurrentLevel, setCurrentLevel, addCoccoline } from "../state.js";
 import { bindKeyboard, resetInput } from "../controls.js";
 import { makePlayer } from "../entities/player.js";
 import { getLevelDef, hasLevel } from "../levels/index.js";
 import { buildLevel } from "../levels/build.js";
+import { showInsertCoin, hideInsertCoin } from "../ui/insertCoin.js";
+import { hideReceipt } from "../ui/receipt.js";
+import { fadeToScene } from "../ui/transition.js";
+import { confettiBurst } from "../juice.js";
 
 // Camera helper — Kaplay renamed cam setters across versions; support both.
 function setCam(p) {
@@ -29,6 +33,10 @@ function setCam(p) {
 
 export function registerGameScene() {
   k.scene("game", () => {
+    // Defensive: clear any DOM overlay left over from another scene.
+    hideInsertCoin();
+    hideReceipt();
+
     const charId = getSelectedCharacter();
     const char = CHARACTERS.find((c) => c.id === charId) || CHARACTERS[0];
     const level = getCurrentLevel();
@@ -58,22 +66,32 @@ export function registerGameScene() {
       setCam(k.vec2(cx, GAME_H / 2));
     });
 
-    // --- Respawn (spec §4: no game-over; restart from the spawn point) ---
+    // --- Failure flow (spec §1: no silent respawn — every failure accrues a debt) ---
+    // Touching a lethal obstacle or falling off the world freezes the heroine and shows a
+    // DOM "Insert Coin" overlay; inserting 500 Coccoline restarts THIS level from the start
+    // (skins persist, since they're derived from the saved level in state — not reset here).
     let finished = false;
-    function respawn() {
-      player.pos = spawn.clone();
-      player.vel = k.vec2(0, 0);
+    let dead = false;
+    function die() {
+      if (finished || dead) return;
+      dead = true;
+      player.paused = true; // freeze the heroine behind the overlay
+      resetInput();
+      showInsertCoin(() => {
+        addCoccoline(500);
+        k.go("game"); // restart the current level from the beginning
+      });
     }
     // Fell into a ravine / off the bottom of the world.
     player.onUpdate(() => {
-      if (!finished && player.pos.y > worldH + 120) respawn();
+      if (!finished && !dead && player.pos.y > worldH + 120) die();
     });
-    // Touched a static hazard (thorns / urchins) or a moving enemy (crab).
+    // Touched a static hazard (thorns / urchins / icicle) or a moving enemy (crab / flyer).
     player.onCollide("hazard", () => {
-      if (!finished) respawn();
+      if (!finished && !dead) die();
     });
     player.onCollide("enemy", () => {
-      if (!finished) respawn();
+      if (!finished && !dead) die();
     });
 
     // --- HUD (fixed; ignores the camera) ---
@@ -98,7 +116,13 @@ export function registerGameScene() {
     // --- Collectibles (golden apples / pearls) ---
     let collected = 0;
     player.onCollide("collectible", (item) => {
-      if (finished) return;
+      if (finished || dead) return;
+      // Confetti pop at the pickup (spec §3).
+      confettiBurst(item.pos, [
+        theme.collectible,
+        theme.collectibleAccent || PALETTE.cream,
+        PALETTE.gold,
+      ]);
       k.destroy(item);
       collected += 1;
       itemLabel.text = `${icon} ${collected}/${collectiblesTotal}`;
@@ -106,7 +130,7 @@ export function registerGameScene() {
 
     // --- Goal: unlock a skin, advance progress, continue to the next level ---
     player.onCollide("goal", () => {
-      if (finished) return;
+      if (finished || dead) return;
       finished = true;
       resetInput();
       const reward = skinUnlockedBy(level);
@@ -133,7 +157,7 @@ export function registerGameScene() {
 
     // Back to the menu (ESC). No full-screen tap handler, so it doesn't fight the
     // on-screen controls during play.
-    k.onKeyPress("escape", () => k.go("menu"));
+    k.onKeyPress("escape", () => fadeToScene(() => k.go("menu")));
   });
 }
 
@@ -148,10 +172,56 @@ function drawBackground(theme) {
     k.fixed(),
     k.z(-99),
   ]);
+  drawParallax(theme); // depth layers that scroll slower than the camera (spec §3)
   if (theme.decor === "coral") drawCoral(theme);
   else if (theme.decor === "rooftops") drawRooftops(theme);
   else if (theme.decor === "snow") drawSnow(theme);
   else drawForest(theme);
+}
+
+// Current camera x (Kaplay renamed the getter across versions).
+function getCamX() {
+  const p = typeof k.getCamPos === "function" ? k.getCamPos() : k.camPos();
+  return p && Number.isFinite(p.x) ? p.x : GAME_W / 2;
+}
+
+// --- Parallax (spec §3): two layers of distant rolling hills that drift left as the camera
+// advances, each at a fraction of camera speed (0.2x far, 0.5x near) for depth. They're big
+// circles centred just below the screen, so only broad, overlapping domes show as a hilly
+// ridge. Screen-fixed and repositioned + wrapped every frame, so they tile across any level.
+// The near layer uses the lighter `solid` tone so the hills read against dark backdrops. ---
+function drawParallax(theme) {
+  const layers = [
+    { factor: 0.2, color: theme.decoFar, cy: GAME_H + 130, r: 340, gap: 520, op: 0.4 },
+    { factor: 0.5, color: theme.solid, cy: GAME_H + 90, r: 280, gap: 420, op: 0.5 },
+  ];
+  layers.forEach(({ factor, color, cy, r, gap, op }) => {
+    const count = Math.ceil(GAME_W / gap) + 3;
+    const span = count * gap;
+    const blobs = [];
+    for (let i = 0; i < count; i++) {
+      blobs.push(
+        k.add([
+          k.circle(r),
+          k.pos(i * gap, cy),
+          k.anchor("center"),
+          k.color(...color),
+          k.opacity(op),
+          k.fixed(),
+          k.z(-98), // above the bg band (-99), behind the themed decor (-95/-96)
+          { baseX: i * gap },
+        ]),
+      );
+    }
+    k.onUpdate(() => {
+      const shift = getCamX() * factor;
+      blobs.forEach((b) => {
+        let x = (b.baseX - shift) % span;
+        if (x < 0) x += span; // wrap into [0, span)
+        b.pos.x = x - 1.5 * gap; // lead-in off the left edge
+      });
+    });
+  });
 }
 
 // Tall tree silhouettes (alberi alti). Fixed = a calm far-parallax layer.
@@ -351,7 +421,7 @@ function showReward(reward, got, total, icon, nextLevel) {
     k.color(...PALETTE.deepBlue),
   ]);
 
-  const proceed = () => k.go(dest);
+  const proceed = () => fadeToScene(() => k.go(dest));
   btn.onClick(proceed);
   k.onKeyPress(["enter", "space"], proceed);
   if (toFinale) {

@@ -47,6 +47,15 @@ export function makePlayer(char, pos, skinKeys = []) {
   player.skinKeys = skinKeys;
   player.skinLayers = addSkinLayers(player, skinKeys);
 
+  // Squash & stretch (spec §3). A squash factor eases back to neutral each frame and gets
+  // "kicked" on jump (tall + thin) and on landing (wide + short); the rendered scale is
+  // BASE * squash, so children (skins) inherit it. Magnitudes are modest and vertical-
+  // dominant so the brief change to the area() collider can't cause an unfair hazard hit.
+  const BASE = PLAYER_SCALE;
+  player.squashX = 1;
+  player.squashY = 1;
+  let wasGrounded = true;
+
   player.onUpdate(() => {
     const input = getInput();
 
@@ -66,7 +75,23 @@ export function makePlayer(char, pos, skinKeys = []) {
     // Jump: edge-triggered and only from the ground (no double-jump).
     if (consumeJump() && player.isGrounded()) {
       player.jump(PHYSICS.JUMP_FORCE);
+      player.squashX = 0.9; // stretch tall on take-off
+      player.squashY = 1.18;
     }
+
+    // Landing impact: airborne -> grounded this frame.
+    const grounded = player.isGrounded();
+    if (grounded && !wasGrounded) {
+      player.squashX = 1.1; // squash wide on land
+      player.squashY = 0.82;
+    }
+    wasGrounded = grounded;
+
+    // Ease the squash back to neutral (framerate-independent) and apply it.
+    const ease = 1 - Math.exp(-k.dt() * 15);
+    player.squashX += (1 - player.squashX) * ease;
+    player.squashY += (1 - player.squashY) * ease;
+    player.scale = k.vec2(BASE * player.squashX, BASE * player.squashY);
   });
 
   return player;

@@ -4,6 +4,7 @@
 import { k } from "./kaplayCtx.js";
 import { loadAssets } from "./assets.js";
 import { bindTouchButtons } from "./controls.js";
+import { bindAudioToggle } from "./ui/audioToggle.js";
 import { registerLoadingScene } from "./scenes/loading.js";
 import { registerMenuScene } from "./scenes/menu.js";
 import { registerGameScene } from "./scenes/game.js";
@@ -14,6 +15,9 @@ loadAssets();
 
 // Wire the on-screen touch buttons once (CSS hides them on non-touch devices).
 bindTouchButtons();
+
+// Wire the global audio on/off button once; it applies any saved mute preference.
+bindAudioToggle();
 
 // Register every scene before navigating.
 registerLoadingScene();

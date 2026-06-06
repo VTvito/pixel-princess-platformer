@@ -35,6 +35,39 @@
       <button id="btn-jump" type="button" aria-label="Salto">⤴</button>
     </div>
 
+    <!-- Global audio on/off (top-right). Wired in src/ui/audioToggle.js. -->
+    <button id="audio-toggle" type="button" aria-label="Disattiva audio">🔊</button>
+
+    <!-- "Insert Coin" death overlay (spec §1). DOM, not Kaplay; shown by
+         src/ui/insertCoin.js when the heroine fails. -->
+    <div id="coin-overlay" class="overlay" hidden>
+      <div class="overlay-card coin-card">
+        <p class="coin-text">
+          Ops! Hai sbagliato.<br />
+          Inserisci <strong>500 Coccoline</strong> per continuare.
+        </p>
+        <button id="coin-btn" type="button" class="ui-btn">Inserisci Coin</button>
+      </div>
+    </div>
+
+    <!-- Finale receipt + WhatsApp payoff (spec §2). Filled by src/ui/receipt.js. -->
+    <div id="receipt-overlay" class="overlay" hidden>
+      <div class="overlay-card receipt-card">
+        <div class="receipt-head">SCONTRINO</div>
+        <div class="receipt-sub">Principessa Perfetta S.p.A.</div>
+        <div class="receipt-rule"></div>
+        <p class="receipt-line">Costo totale dell'operazione:</p>
+        <p class="receipt-total"><span id="receipt-amount">0</span> Coccoline</p>
+        <div class="receipt-rule"></div>
+        <p class="receipt-foot">Grazie per aver giocato ❤️</p>
+        <button id="receipt-pay" type="button" class="ui-btn pay-btn">Paga il Debito!</button>
+        <button id="receipt-close" type="button" class="ui-btn ghost-btn">Chiudi</button>
+      </div>
+    </div>
+
+    <!-- Scene-transition fade (spec §4). Purely visual; pointer-none. -->
+    <div id="fade"></div>
+
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>

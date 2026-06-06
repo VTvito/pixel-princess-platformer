@@ -6,9 +6,12 @@
 
 import { k } from "../kaplayCtx.js";
 import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE } from "../config.js";
-import { getSelectedCharacter } from "../state.js";
+import { getSelectedCharacter, getCoccoline } from "../state.js";
 import { addSkinLayers } from "../entities/player.js";
 import { resetInput } from "../controls.js";
+import { showReceipt, hideReceipt } from "../ui/receipt.js";
+import { hideInsertCoin } from "../ui/insertCoin.js";
+import { fadeToScene } from "../ui/transition.js";
 
 // Camera helper — Kaplay renamed cam setters across versions; support both.
 function setCam(p) {
@@ -18,6 +21,10 @@ function setCam(p) {
 
 export function registerFinaleScene() {
   k.scene("finale", () => {
+    // Defensive: clear any leftover death overlay; the receipt is shown below after a beat.
+    hideInsertCoin();
+    hideReceipt();
+
     const charId = getSelectedCharacter();
     const char = CHARACTERS.find((c) => c.id === charId) || CHARACTERS[0];
 
@@ -101,9 +108,13 @@ export function registerFinaleScene() {
       btn.scale = k.vec2(1);
       k.setCursor("default");
     });
-    const toMenu = () => k.go("menu");
+    const toMenu = () => fadeToScene(() => k.go("menu"));
     btn.onClick(toMenu);
     k.onKeyPress(["enter", "space", "escape"], toMenu);
+
+    // The payoff (spec §2): after a beat to let the cutscene land, show the receipt with
+    // the total Coccoline debt + the WhatsApp "Paga il Debito!" button.
+    k.wait(1.4, () => showReceipt(getCoccoline()));
   });
 }
 

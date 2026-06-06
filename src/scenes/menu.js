@@ -11,6 +11,9 @@ import {
   setCurrentLevel,
 } from "../state.js";
 import { getLevelDef } from "../levels/index.js";
+import { fadeToScene } from "../ui/transition.js";
+import { hideInsertCoin } from "../ui/insertCoin.js";
+import { hideReceipt } from "../ui/receipt.js";
 
 // Tracks whether the menu music has been started, so we only call play() once on the
 // first user gesture (the audio-context unlock).
@@ -57,6 +60,10 @@ function makeButton(parent, { x, y, w, h, label, onClick, base = PALETTE.gold, t
 
 export function registerMenuScene() {
   k.scene("menu", () => {
+    // Defensive: clear any DOM overlay left over from gameplay / the finale.
+    hideInsertCoin();
+    hideReceipt();
+
     // Soft fairy-tale backdrop.
     k.add([k.rect(GAME_W, GAME_H), k.pos(0, 0), k.color(...PALETTE.lilac)]);
 
@@ -115,7 +122,7 @@ export function registerMenuScene() {
         label: resumeFinale ? "↻  Rivedi il Gran Ballo" : `↻  Riprendi · Livello ${savedLevel}`,
         onClick: () => {
           unlockAudio(); // first user gesture -> audio context unlocked
-          k.go(resumeFinale ? "finale" : "game"); // keeps saved character + level (skins)
+          fadeToScene(() => k.go(resumeFinale ? "finale" : "game")); // keeps char + level
         },
       });
       startLayer.add([
@@ -218,7 +225,7 @@ export function registerMenuScene() {
         setSelectedCharacter(char.id);
         setCurrentLevel(1);   // "Nuova partita" always begins the journey from level 1
         unlockAudio();        // first user gesture -> audio context unlocked
-        k.go("game");
+        fadeToScene(() => k.go("game"));
       });
     });
   });
