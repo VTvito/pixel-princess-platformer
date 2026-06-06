@@ -1,0 +1,27 @@
+# --- Dev tooling (the game itself has no build step; these are test-harness only) ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Playwright browser cache / traces (we launch installed Edge, not a download)
+.playwright/
+playwright-report/
+test-results/
+*.webm
+
+# --- Python tooling cruft ---
+__pycache__/
+*.py[cod]
+
+# --- Personal / local config (machine-specific; not shared) ---
+.claude/settings.local.json
+
+# --- Editors ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS cruft ---
+Thumbs.db
+Desktop.ini
+.DS_Store

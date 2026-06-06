@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Mobile-first, landscape platformer. viewport-fit=cover handles iPhone notch. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#26325c" />
+    <title>The Princess Journey</title>
+    <!-- Inline empty icon to avoid a 404 favicon request. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- Kaplay renders here; it letterboxes the 16:9 canvas inside the viewport. -->
+    <canvas id="game"></canvas>
+
+    <!-- Shown only when a touch device is held in portrait (CSS-driven). -->
+    <div id="rotate-overlay">
+      <div class="rotate-inner">
+        <div class="rotate-icon">🔄</div>
+        <p>Ruota il dispositivo in orizzontale</p>
+      </div>
+    </div>
+
+    <!-- On-screen controls. Shown only on touch devices (CSS @media pointer:coarse);
+         wired in src/controls.js via pointer/touch events. -->
+    <div id="touch-controls">
+      <div id="dpad">
+        <button id="btn-left" type="button" aria-label="Sinistra">◀</button>
+        <button id="btn-right" type="button" aria-label="Destra">▶</button>
+      </div>
+      <button id="btn-jump" type="button" aria-label="Salto">⤴</button>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

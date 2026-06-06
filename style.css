@@ -1,0 +1,134 @@
+/* Full-bleed canvas with letterbox background. Kaplay scales the 16:9 game canvas to
+   fit the viewport (letterbox: true), keeping aspect ratio; the body color shows in the
+   bars. */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #26325c; /* deep blue letterbox bars */
+  /* Disable touch gestures (scroll/zoom) that would interfere with game controls. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Rotate-device overlay --------------------------------------------------
+   Only relevant on touch devices (coarse pointer) held in portrait. On desktop
+   (fine pointer) it stays hidden regardless of window proportions. */
+#rotate-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #26325c;
+  color: #fff8f0;
+  font-family: sans-serif;
+  text-align: center;
+  z-index: 10;
+}
+
+.rotate-inner {
+  padding: 24px;
+}
+
+.rotate-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: rotate-hint 1.6s ease-in-out infinite;
+}
+
+.rotate-inner p {
+  font-size: 20px;
+  opacity: 0.9;
+}
+
+@keyframes rotate-hint {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-overlay {
+    display: flex;
+  }
+}
+
+/* --- On-screen touch controls ----------------------------------------------
+   A full-viewport, click-through layer; only the buttons capture input. Hidden by
+   default and revealed on coarse-pointer (touch) devices. */
+#touch-controls {
+  position: fixed;
+  inset: 0;
+  display: none;
+  pointer-events: none; /* layer is transparent to input… */
+  z-index: 5; /* above canvas, below the portrait rotate-overlay */
+}
+
+#touch-controls button {
+  pointer-events: auto; /* …but the buttons themselves are tappable */
+  position: absolute;
+  bottom: 24px;
+  width: 84px;
+  height: 84px;
+  border: none;
+  border-radius: 50%;
+  font-size: 36px;
+  line-height: 1;
+  color: #fff8f0;
+  background: rgba(38, 50, 92, 0.45); /* deep blue, translucent */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Generous invisible hit padding beyond the visible circle (spec §2). */
+  padding: 8px;
+}
+
+#touch-controls button.is-active {
+  background: rgba(212, 175, 55, 0.7); /* gold while pressed */
+  transform: scale(0.94);
+}
+
+/* D-pad bottom-left: left and right side by side. */
+#btn-left {
+  left: 24px;
+}
+#btn-right {
+  left: 132px; /* 24 + 84 + 24 gap */
+}
+
+/* Jump bottom-right. */
+#btn-jump {
+  right: 24px;
+}
+
+@media (pointer: coarse) {
+  #touch-controls {
+    display: block;
+  }
+}
