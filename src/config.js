@@ -124,5 +124,14 @@ export const ASSETS = {
   },
   sounds: {
     "menu-bgm": "assets/audio/menu-bgm.wav",
+    // Gameplay SFX (spec §3/§4) — synthesized placeholders, played via src/sfx.js so the
+    // global 🔊/🔇 toggle mutes them. Swap the files keeping these keys.
+    jump: "assets/audio/jump.wav",
+    collect: "assets/audio/collect.wav",
+    coin: "assets/audio/coin.wav",
+    oops: "assets/audio/oops.wav",
+    goal: "assets/audio/goal.wav",
+    win: "assets/audio/win.wav",
+    select: "assets/audio/select.wav",
   },
 };

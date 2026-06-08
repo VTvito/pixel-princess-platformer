@@ -10,9 +10,10 @@ size and transparency the future skin-layering system expects (spec section 3).
 Replace the files in assets/sprites with real art later, keeping the same
 filenames (or update ASSETS in src/config.js).
 
-Audio: a short, gentle WAV tone as the menu-music placeholder. Replace
-assets/audio/menu-bgm.wav with a real track later (update the extension in
-src/config.js ASSETS if it changes).
+Audio: a short, gentle WAV tone as the menu-music placeholder, plus a set of tiny
+synthesized gameplay SFX (jump / collect / coin / oops / goal / win / select).
+Replace the files in assets/audio later with real sound, keeping the filenames
+(or update ASSETS.sounds in src/config.js if any extension changes).
 """
 
 import math
@@ -117,6 +118,118 @@ def make_wav(path: str, seconds: float = 2.0, sample_rate: int = 22050, freq: fl
         w.writeframes(bytes(frames))
 
 
+# --- Sound effects (gameplay juiciness) -------------------------------------------
+# Tiny synthesized WAVs (same stdlib-only approach as the bgm). Each is built from simple
+# oscillators with a short anti-click attack/release and an optional exponential decay.
+
+SFX_RATE = 22050
+
+
+def _osc(phase: float, wave: str) -> float:
+    if wave == "tri":
+        return (2.0 / math.pi) * math.asin(math.sin(phase))
+    if wave == "square":
+        return 1.0 if math.sin(phase) >= 0 else -1.0
+    if wave == "saw":
+        x = phase / (2 * math.pi)
+        return 2.0 * (x - math.floor(x + 0.5))
+    return math.sin(phase)
+
+
+def tone(freq, dur, vol=0.5, wave="sine", decay=0.0, f_end=None, sr=SFX_RATE):
+    """One oscillator note. Accumulates phase (so f_end gives a clean pitch glide), with a
+    short anti-click fade in/out and an optional exponential amplitude decay."""
+    n = max(1, int(dur * sr))
+    atk = max(1, int(0.004 * sr))
+    rel = max(1, int(0.006 * sr))
+    out = []
+    phase = 0.0
+    for i in range(n):
+        f = freq if f_end is None else freq + (f_end - freq) * (i / max(1, n - 1))
+        phase += 2 * math.pi * f / sr
+        s = _osc(phase, wave) * vol
+        if decay > 0:
+            s *= math.exp(-decay * (i / sr))
+        s *= min(1.0, i / atk)        # fade in
+        s *= min(1.0, (n - i) / rel)  # fade out
+        out.append(s)
+    return out
+
+
+def seq(*parts):
+    out = []
+    for p in parts:
+        out.extend(p)
+    return out
+
+
+def mix(*parts):
+    n = max(len(p) for p in parts)
+    out = [0.0] * n
+    for p in parts:
+        for i, v in enumerate(p):
+            out[i] += v
+    return out
+
+
+def normalize(samples, peak=0.85):
+    m = max((abs(s) for s in samples), default=0.0)
+    if m <= 1e-9:
+        return samples
+    g = peak / m
+    return [s * g for s in samples]
+
+
+def build_sfx():
+    """{name: samples} for every gameplay sound. Frequencies are musical so the cues feel
+    pleasant rather than beepy; the 'oops' is a soft downward glide (it's a gentle gift, not
+    a harsh death sound), and 'coin' is a two-note arcade chime that fits the Insert-Coin gag."""
+    return {
+        "jump": tone(420, 0.13, vol=0.5, wave="tri", f_end=780, decay=6),
+        "collect": seq(
+            tone(1175, 0.05, vol=0.45, wave="sine"),
+            tone(1568, 0.11, vol=0.5, wave="sine", decay=8),
+        ),
+        "coin": seq(
+            tone(988, 0.07, vol=0.45, wave="tri"),
+            tone(1319, 0.42, vol=0.45, wave="tri", decay=6),
+        ),
+        "oops": tone(659, 0.32, vol=0.5, wave="sine", f_end=415, decay=3),
+        "goal": seq(
+            tone(523, 0.08, vol=0.4, wave="tri"),
+            tone(659, 0.08, vol=0.4, wave="tri"),
+            tone(784, 0.08, vol=0.4, wave="tri"),
+            tone(1047, 0.30, vol=0.5, wave="tri", decay=4),
+        ),
+        "win": seq(
+            tone(523, 0.10, vol=0.4, wave="tri"),
+            tone(659, 0.10, vol=0.4, wave="tri"),
+            tone(784, 0.10, vol=0.4, wave="tri"),
+            mix(
+                tone(523, 0.70, vol=0.22, wave="sine", decay=2.2),
+                tone(659, 0.70, vol=0.22, wave="sine", decay=2.2),
+                tone(784, 0.70, vol=0.22, wave="sine", decay=2.2),
+                tone(1047, 0.70, vol=0.22, wave="sine", decay=2.2),
+            ),
+        ),
+        "select": seq(
+            tone(784, 0.04, vol=0.32, wave="sine"),
+            tone(1175, 0.07, vol=0.32, wave="sine", decay=12),
+        ),
+    }
+
+
+def make_sfx(path: str, samples, sr: int = SFX_RATE) -> None:
+    frames = bytearray()
+    for s in samples:
+        frames.extend(struct.pack("<h", int(max(-1.0, min(1.0, s)) * 0x7FFF)))
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(bytes(frames))
+
+
 SPRITES = [
     ("anna.png", (167, 199, 231)),        # azzurro/lilla (piumino)
     ("sognatrice.png", (240, 198, 116)),  # warm gold (Belle/Ariel)
@@ -148,6 +261,12 @@ def main() -> None:
 
     make_wav(os.path.join(AUDIO_DIR, "menu-bgm.wav"))
     print("audio  ->", os.path.join("assets", "audio", "menu-bgm.wav"))
+
+    for name, samples in build_sfx().items():
+        path = os.path.join(AUDIO_DIR, f"{name}.wav")
+        make_sfx(path, normalize(samples))
+        print("sfx    ->", os.path.join("assets", "audio", f"{name}.wav"))
+
     print("\nDone. Placeholder assets generated.")
 
 

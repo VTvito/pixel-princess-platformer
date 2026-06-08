@@ -12,6 +12,7 @@ import { resetInput } from "../controls.js";
 import { showReceipt, hideReceipt } from "../ui/receipt.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
 import { fadeToScene } from "../ui/transition.js";
+import { sfx } from "../sfx.js";
 
 // Camera helper — Kaplay renamed cam setters across versions; support both.
 function setCam(p) {
@@ -34,6 +35,7 @@ export function registerFinaleScene() {
     resetInput();
 
     drawBallroom();
+    k.wait(0.2, () => sfx("win")); // warm fanfare as the ballroom settles in
 
     // --- The heroine as "Principessa Perfetta": base body + all four skins layered on ---
     const baseY = 300;
@@ -108,7 +110,10 @@ export function registerFinaleScene() {
       btn.scale = k.vec2(1);
       k.setCursor("default");
     });
-    const toMenu = () => fadeToScene(() => k.go("menu"));
+    const toMenu = () => {
+      sfx("select");
+      fadeToScene(() => k.go("menu"));
+    };
     btn.onClick(toMenu);
     k.onKeyPress(["enter", "space", "escape"], toMenu);
 

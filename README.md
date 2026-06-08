@@ -34,7 +34,7 @@ dependency — the game itself still has no build step). Start the server, then 
 npm install             # once: fetches playwright-core (skips the browser download)
 npm run serve           # terminal 1 — serves http://localhost:8137
 npm test                # terminal 2 — smoke: boots to the menu, no console errors
-npm run test:features   # deeper: audio toggle, movement/jump, Insert Coin, finale receipt
+npm run test:features   # deeper: audio toggle, SFX load, movement/jump, Insert Coin, receipt
 npm run test:levels     # boots each of levels 1–4, asserts no errors + screenshots the art
 ```
 
@@ -64,6 +64,7 @@ This writes:
 - `assets/sprites/{anna,sognatrice,avventuriera,logo}.png` — 64×64 transparent RGBA
   (same size/transparency the skin-layering system will need).
 - `assets/audio/menu-bgm.wav` — a short placeholder track.
+- `assets/audio/{jump,collect,coin,oops,goal,win,select}.wav` — synthesized gameplay SFX.
 
 ### Swapping in real assets
 
@@ -85,6 +86,7 @@ src/
   state.js              localStorage: selectedCharacter, currentLevel, totaleCoccoline
   controls.js           reusable input layer: keyboard + DOM touch buttons
   juice.js              game-feel helpers (confetti burst) — pure Kaplay, no DOM
+  sfx.js                one-shot sound effects (k.play wrapper; honours the mute toggle)
   ui/                   DOM/HTML overlays, isolated from the game's collision logic
     insertCoin.js       "Insert Coin" death overlay (spec §1)
     receipt.js          finale "Scontrino" + WhatsApp payoff (spec §2)
@@ -187,7 +189,9 @@ collision logic in `game.js`:
   debt and a **Paga il Debito!** button that opens a pre-filled WhatsApp share (no fixed
   number; the amount is substituted into the link).
 - **Game feel.** Squash & stretch on jump/land, a confetti burst on every pickup, a soft
-  themed aura behind each collectible, and rising motes at every level goal.
+  themed aura behind each collectible, rising motes at every level goal, and synthesized
+  **sound effects** (jump, collect, Insert-Coin, level clear, finale fanfare) wrapped in
+  `src/sfx.js` so the 🔊 / 🔇 toggle mutes them too.
 - **Per-level art.** A two-layer parallax backdrop (0.2× / 0.5× the camera speed) whose
   ridge colours are tuned per theme (`parallaxFar` / `parallaxNear`) so they read on both
   dark (forest, dusk) and pale (snow) skies, plus signature ambient particles for every

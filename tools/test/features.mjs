@@ -66,6 +66,29 @@ try {
   await page.mouse.click(640, 360);
   await page.waitForTimeout(50);
 
+  // --- SFX assets registered + playable (Specifiche_Polishing §3/§4). The focus click above
+  // is a user gesture, so the AudioContext is unlocked and these silent probes stay quiet. ---
+  const sfxMissing = await page.evaluate(() => {
+    const k = window.__pj.k;
+    const names = ["jump", "collect", "coin", "oops", "goal", "win", "select"];
+    const missing = [];
+    for (const n of names) {
+      try {
+        const h = k.play(n, { volume: 0 });
+        if (!h) missing.push(n);
+        else if (typeof h.stop === "function") h.stop();
+      } catch {
+        missing.push(n);
+      }
+    }
+    return missing;
+  });
+  check(
+    "sfx assets load + play",
+    sfxMissing.length === 0,
+    sfxMissing.length ? `missing: ${sfxMissing.join(",")}` : "7/7",
+  );
+
   // Movement (held key → Δx) and jump (apex Δy upward).
   const px = () => page.evaluate(() => window.__pj.k.get("player")[0].pos.x);
   const py = () => page.evaluate(() => window.__pj.k.get("player")[0].pos.y);

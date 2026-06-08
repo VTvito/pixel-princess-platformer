@@ -7,9 +7,10 @@
 // in assets/sprites with real art later; keep the same filenames (or update ASSETS in
 // src/config.js).
 //
-// Audio: a short, gentle WAV tone for the menu music placeholder. Replace
-// assets/audio/menu-bgm.wav with a real track later (update the extension in
-// src/config.js ASSETS if it changes).
+// Audio: a short, gentle WAV tone for the menu music placeholder, plus tiny synthesized
+// gameplay SFX (jump / collect / coin / oops / goal / win / select). Replace the files in
+// assets/audio later with real sound, keeping the filenames (or update ASSETS.sounds in
+// src/config.js if an extension changes).
 
 import { deflateSync } from "node:zlib";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -156,6 +157,109 @@ function makeWav({ seconds = 2, sampleRate = 22050, freq = 440 } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Sound effects — tiny synthesized WAVs (mirrors tools/gen_placeholders.py). Simple
+// oscillators with a short anti-click fade in/out and an optional exponential decay.
+// ---------------------------------------------------------------------------
+const SFX_RATE = 22050;
+
+function osc(phase, wave) {
+  if (wave === "tri") return (2 / Math.PI) * Math.asin(Math.sin(phase));
+  if (wave === "square") return Math.sin(phase) >= 0 ? 1 : -1;
+  if (wave === "saw") {
+    const x = phase / (2 * Math.PI);
+    return 2 * (x - Math.floor(x + 0.5));
+  }
+  return Math.sin(phase);
+}
+
+function tone(freq, dur, { vol = 0.5, wave = "sine", decay = 0, fEnd = null, sr = SFX_RATE } = {}) {
+  const n = Math.max(1, Math.floor(dur * sr));
+  const atk = Math.max(1, Math.floor(0.004 * sr));
+  const rel = Math.max(1, Math.floor(0.006 * sr));
+  const out = new Array(n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const f = fEnd === null ? freq : freq + (fEnd - freq) * (i / Math.max(1, n - 1));
+    phase += (2 * Math.PI * f) / sr;
+    let s = osc(phase, wave) * vol;
+    if (decay > 0) s *= Math.exp(-decay * (i / sr));
+    s *= Math.min(1, i / atk); // fade in
+    s *= Math.min(1, (n - i) / rel); // fade out
+    out[i] = s;
+  }
+  return out;
+}
+
+const seq = (...parts) => parts.flat();
+
+function mix(...parts) {
+  const n = Math.max(...parts.map((p) => p.length));
+  const out = new Array(n).fill(0);
+  for (const p of parts) for (let i = 0; i < p.length; i++) out[i] += p[i];
+  return out;
+}
+
+function normalize(samples, peak = 0.85) {
+  let m = 0;
+  for (const s of samples) m = Math.max(m, Math.abs(s));
+  if (m <= 1e-9) return samples;
+  const g = peak / m;
+  return samples.map((s) => s * g);
+}
+
+function buildSfx() {
+  return {
+    jump: tone(420, 0.13, { vol: 0.5, wave: "tri", fEnd: 780, decay: 6 }),
+    collect: seq(tone(1175, 0.05, { vol: 0.45 }), tone(1568, 0.11, { vol: 0.5, decay: 8 })),
+    coin: seq(
+      tone(988, 0.07, { vol: 0.45, wave: "tri" }),
+      tone(1319, 0.42, { vol: 0.45, wave: "tri", decay: 6 }),
+    ),
+    oops: tone(659, 0.32, { vol: 0.5, fEnd: 415, decay: 3 }),
+    goal: seq(
+      tone(523, 0.08, { vol: 0.4, wave: "tri" }),
+      tone(659, 0.08, { vol: 0.4, wave: "tri" }),
+      tone(784, 0.08, { vol: 0.4, wave: "tri" }),
+      tone(1047, 0.3, { vol: 0.5, wave: "tri", decay: 4 }),
+    ),
+    win: seq(
+      tone(523, 0.1, { vol: 0.4, wave: "tri" }),
+      tone(659, 0.1, { vol: 0.4, wave: "tri" }),
+      tone(784, 0.1, { vol: 0.4, wave: "tri" }),
+      mix(
+        tone(523, 0.7, { vol: 0.22, decay: 2.2 }),
+        tone(659, 0.7, { vol: 0.22, decay: 2.2 }),
+        tone(784, 0.7, { vol: 0.22, decay: 2.2 }),
+        tone(1047, 0.7, { vol: 0.22, decay: 2.2 }),
+      ),
+    ),
+    select: seq(tone(784, 0.04, { vol: 0.32 }), tone(1175, 0.07, { vol: 0.32, decay: 12 })),
+  };
+}
+
+function encodeWav(samples, sampleRate = SFX_RATE) {
+  const data = Buffer.alloc(samples.length * 2);
+  for (let i = 0; i < samples.length; i++) {
+    data.writeInt16LE(Math.max(-1, Math.min(1, samples[i])) * 0x7fff, i * 2);
+  }
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0, "ascii");
+  header.writeUInt32LE(36 + data.length, 4);
+  header.write("WAVE", 8, "ascii");
+  header.write("fmt ", 12, "ascii");
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36, "ascii");
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}
+
+// ---------------------------------------------------------------------------
 // Generate everything.
 // ---------------------------------------------------------------------------
 mkdirSync(SPRITES_DIR, { recursive: true });
@@ -191,5 +295,10 @@ for (const s of SKINS) {
 
 writeFileSync(join(AUDIO_DIR, "menu-bgm.wav"), makeWav({ seconds: 2, freq: 392 }));
 console.log("audio  ->", join("assets", "audio", "menu-bgm.wav"));
+
+for (const [name, samples] of Object.entries(buildSfx())) {
+  writeFileSync(join(AUDIO_DIR, `${name}.wav`), encodeWav(normalize(samples)));
+  console.log("sfx    ->", join("assets", "audio", `${name}.wav`));
+}
 
 console.log("\nDone. Placeholder assets generated.");

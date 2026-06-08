@@ -14,6 +14,7 @@ import { getLevelDef } from "../levels/index.js";
 import { fadeToScene } from "../ui/transition.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
 import { hideReceipt } from "../ui/receipt.js";
+import { sfx } from "../sfx.js";
 
 // Tracks whether the menu music has been started, so we only call play() once on the
 // first user gesture (the audio-context unlock).
@@ -122,6 +123,7 @@ export function registerMenuScene() {
         label: resumeFinale ? "↻  Rivedi il Gran Ballo" : `↻  Riprendi · Livello ${savedLevel}`,
         onClick: () => {
           unlockAudio(); // first user gesture -> audio context unlocked
+          sfx("select");
           fadeToScene(() => k.go(resumeFinale ? "finale" : "game")); // keeps char + level
         },
       });
@@ -225,6 +227,7 @@ export function registerMenuScene() {
         setSelectedCharacter(char.id);
         setCurrentLevel(1);   // "Nuova partita" always begins the journey from level 1
         unlockAudio();        // first user gesture -> audio context unlocked
+        sfx("select");
         fadeToScene(() => k.go("game"));
       });
     });

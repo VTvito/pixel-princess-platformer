@@ -5,6 +5,7 @@
 import { k } from "../kaplayCtx.js";
 import { PHYSICS } from "../config.js";
 import { getInput, consumeJump } from "../controls.js";
+import { sfx } from "../sfx.js";
 
 // Placeholder sprites are 64×64; scale up so the heroine reads at the game's resolution.
 const PLAYER_SCALE = 2;
@@ -75,6 +76,7 @@ export function makePlayer(char, pos, skinKeys = []) {
     // Jump: edge-triggered and only from the ground (no double-jump).
     if (consumeJump() && player.isGrounded()) {
       player.jump(PHYSICS.JUMP_FORCE);
+      sfx("jump");
       player.squashX = 0.9; // stretch tall on take-off
       player.squashY = 1.18;
     }

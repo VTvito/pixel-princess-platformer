@@ -24,6 +24,7 @@ import { showInsertCoin, hideInsertCoin } from "../ui/insertCoin.js";
 import { hideReceipt } from "../ui/receipt.js";
 import { fadeToScene } from "../ui/transition.js";
 import { confettiBurst } from "../juice.js";
+import { sfx } from "../sfx.js";
 
 // Camera helper — Kaplay renamed cam setters across versions; support both.
 function setCam(p) {
@@ -76,8 +77,10 @@ export function registerGameScene() {
       if (finished || dead) return;
       dead = true;
       player.paused = true; // freeze the heroine behind the overlay
+      sfx("oops"); // gentle "you slipped" cue (no harsh game-over — spec §1)
       resetInput();
       showInsertCoin(() => {
+        sfx("coin"); // arcade-coin chime as the debt is banked
         addCoccoline(500);
         k.go("game"); // restart the current level from the beginning
       });
@@ -117,12 +120,13 @@ export function registerGameScene() {
     let collected = 0;
     player.onCollide("collectible", (item) => {
       if (finished || dead) return;
-      // Confetti pop at the pickup (spec §3).
+      // Confetti pop + chime at the pickup (spec §3).
       confettiBurst(item.pos, [
         theme.collectible,
         theme.collectibleAccent || PALETTE.cream,
         PALETTE.gold,
       ]);
+      sfx("collect");
       k.destroy(item);
       collected += 1;
       itemLabel.text = `${icon} ${collected}/${collectiblesTotal}`;
@@ -132,6 +136,7 @@ export function registerGameScene() {
     player.onCollide("goal", () => {
       if (finished || dead) return;
       finished = true;
+      sfx("goal"); // triumphant arpeggio on clearing the level
       resetInput();
       const reward = skinUnlockedBy(level);
       setCurrentLevel(level + 1); // persist progress (drives the skin layering next level)
@@ -463,7 +468,10 @@ function showReward(reward, got, total, icon, nextLevel) {
     k.color(...PALETTE.deepBlue),
   ]);
 
-  const proceed = () => fadeToScene(() => k.go(dest));
+  const proceed = () => {
+    sfx("select");
+    fadeToScene(() => k.go(dest));
+  };
   btn.onClick(proceed);
   k.onKeyPress(["enter", "space"], proceed);
   if (toFinale) {
