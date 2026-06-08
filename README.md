@@ -191,7 +191,7 @@ collision logic in `game.js`:
 - **Per-level art.** A two-layer parallax backdrop (0.2× / 0.5× the camera speed) whose
   ridge colours are tuned per theme (`parallaxFar` / `parallaxNear`) so they read on both
   dark (forest, dusk) and pale (snow) skies, plus signature ambient particles for every
-  level: forest calm, coral bubbles, **dusk fireflies/embers (Tetti d'Oriente)**, alpine snow.
+  level: **enchanted-forest fireflies/pollen**, coral bubbles, dusk embers, alpine snow.
 - **Quality of life.** A CSS fade between scenes, an always-on **🔊 / 🔇** audio toggle
   (top-right, choice persisted), and instant press feedback on the touch buttons.
 

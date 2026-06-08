@@ -30,6 +30,7 @@ export const LEVEL_1 = {
     decoNear: [22, 49, 41], // nearer tree silhouettes
     parallaxFar: [34, 66, 54], // distant misty hills (parallax far layer)
     parallaxNear: [50, 90, 66], // nearer rolling hills (parallax near layer)
+    mote: [206, 230, 150], // floating fireflies / pollen (enchanted-forest ambience)
     solid: [74, 104, 60], // mossy earth/platform fill
     solidTop: [122, 178, 94], // bright grassy top accent
     hazard: [122, 38, 58], // bramble body

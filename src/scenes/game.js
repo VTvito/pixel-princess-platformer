@@ -176,9 +176,12 @@ function drawBackground(theme) {
   if (theme.decor === "coral") drawCoral(theme);
   else if (theme.decor === "rooftops") {
     drawRooftops(theme);
-    drawEmbers(theme); // dusk fireflies/embers — ambient motion like coral's bubbles
+    drawMotes(theme); // dusk fireflies/embers — ambient motion like coral's bubbles
   } else if (theme.decor === "snow") drawSnow(theme);
-  else drawForest(theme);
+  else {
+    drawForest(theme);
+    drawMotes(theme); // enchanted-forest fireflies/pollen
+  }
 }
 
 // Current camera x (Kaplay renamed the getter across versions).
@@ -308,29 +311,32 @@ function drawRooftops(theme) {
   });
 }
 
-// Warm dusk motes (fireflies / lantern embers) that rise and gently sway — ambient life for
-// the eastern-rooftops level, echoing its glowing-lantern collectibles. Mirrors the drifting
-// bubbles (coral) and snow (alpine) so every level has signature ambient motion.
-function drawEmbers(theme) {
-  const tint = theme.ember || [255, 198, 120];
+// Floating ambient motes that drift upward, gently sway, and twinkle — used for the
+// enchanted forest's fireflies/pollen and the eastern-rooftops dusk embers (tint via
+// theme.mote). Mirrors the drifting bubbles (coral) and snow (alpine) so every level has
+// signature ambient motion.
+function drawMotes(theme) {
+  const tint = theme.mote || [255, 198, 120];
   for (let i = 0; i < 18; i++) {
     const rise = k.rand(10, 26);
     const swayAmp = k.rand(6, 16);
     const swaySpd = k.rand(0.6, 1.4);
+    const baseOp = k.rand(0.3, 0.6);
     const m = k.add([
       k.circle(k.rand(2, 4)),
       k.pos(k.rand(0, GAME_W), k.rand(0, GAME_H)),
       k.color(...tint),
-      k.opacity(k.rand(0.3, 0.6)),
+      k.opacity(baseOp),
       k.fixed(),
       k.z(-90),
-      { baseX: 0, t: k.rand(0, Math.PI * 2) },
+      { baseX: 0, t: k.rand(0, Math.PI * 2), baseOp },
     ]);
     m.baseX = m.pos.x;
     m.onUpdate(() => {
       m.t += k.dt() * swaySpd;
       m.pos.y -= rise * k.dt();
       m.pos.x = m.baseX + Math.sin(m.t) * swayAmp;
+      m.opacity = m.baseOp * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(m.t * 2.3))); // gentle twinkle
       if (m.pos.y < -8) {
         m.pos.y = GAME_H + 8;
         m.baseX = k.rand(0, GAME_W);

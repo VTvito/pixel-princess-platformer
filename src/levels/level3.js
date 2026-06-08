@@ -21,7 +21,7 @@ export const LEVEL_3 = {
     decoNear: [28, 18, 36], // nearer roofs
     parallaxFar: [86, 50, 90], // distant dusk mountains (parallax far)
     parallaxNear: [120, 58, 76], // nearer dusk ridge (parallax near)
-    ember: [255, 198, 120], // drifting dusk fireflies/embers (ambient particles)
+    mote: [255, 198, 120], // drifting dusk fireflies/embers (ambient particles)
     solid: [92, 42, 48], // terracotta roof tile
     solidTop: [196, 120, 70], // sunlit roof ridge
     hazard: [60, 50, 58], // broken-tile spikes
