@@ -14,7 +14,7 @@
 //
 // Exit code 0 = pass, 1 = fail. Screenshots are always written.
 
-import { chromium } from "playwright-core";
+import { launchBrowser } from "./browser.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -26,7 +26,7 @@ const LEVELS = [1, 2, 3, 4];
 const allErrors = [];
 let failed = false;
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on("console", (msg) => {

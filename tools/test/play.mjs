@@ -27,7 +27,7 @@
 //
 // Exit code 0 = every level reached its goal; 1 = at least one was unreachable.
 
-import { chromium } from "playwright-core";
+import { launchBrowser } from "./browser.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
@@ -100,7 +100,22 @@ const tick = (page) =>
 
     inp.left = false;
     inp.right = action !== "wait";
-    if (action === "jump" && grounded) inp.jump = true;
+
+    // Variable jump height: the player now cuts the rise if jumpHeld goes false early, so a
+    // single-tick tap only gives the minimum hop. To clear ravines/obstacles the bot must
+    // HOLD the jump for several ticks. Start a hold when grounded and a jump is wanted, then
+    // keep jumpHeld up for ~7 ticks (≈0.5s, the full rise) before releasing.
+    if (window.__botJumpHold === undefined) window.__botJumpHold = 0;
+    if (action === "jump" && grounded && window.__botJumpHold === 0) {
+      inp.jump = true; // edge: triggers the jump this frame
+      inp.jumpHeld = true;
+      window.__botJumpHold = 7;
+    } else if (window.__botJumpHold > 0) {
+      inp.jumpHeld = true; // keep holding through the rise
+      window.__botJumpHold--;
+    } else {
+      inp.jumpHeld = false;
+    }
     out.action = action;
     return out;
   });
@@ -193,7 +208,7 @@ async function playLevel(page, n) {
   return { ok: false, level: n, why: "timeout", maxX, goalX, deaths: seenDeaths, stuckX: lastX2 };
 }
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await launchBrowser();
 let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });

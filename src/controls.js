@@ -12,6 +12,7 @@ const input = {
   left: false,
   right: false,
   jump: false, // edge flag, consumed by the player each frame
+  jumpHeld: false, // held flag (true while jump key/button is down) — drives variable jump height
 };
 
 /** Live input object (read every frame by the player). */
@@ -36,8 +37,11 @@ export function bindKeyboard() {
   k.onKeyDown("right", () => (input.right = true));
   k.onKeyRelease("left", () => (input.left = false));
   k.onKeyRelease("right", () => (input.right = false));
-  // Space or Up to jump — edge-triggered.
+  // Space or Up to jump — edge flag for the discrete action, plus a held flag (down/release)
+  // so the player can modulate jump height (releasing early cuts the rise).
   k.onKeyPress(["space", "up"], () => (input.jump = true));
+  k.onKeyDown(["space", "up"], () => (input.jumpHeld = true));
+  k.onKeyRelease(["space", "up"], () => (input.jumpHeld = false));
 }
 
 // --- Mobile DOM buttons -------------------------------------------------------
@@ -83,10 +87,12 @@ export function bindTouchButtons() {
   const jumpDown = (e) => {
     e.preventDefault();
     input.jump = true;
+    input.jumpHeld = true;
     jump.classList.add("is-active");
   };
   const jumpUp = (e) => {
     e.preventDefault();
+    input.jumpHeld = false;
     jump.classList.remove("is-active");
   };
   jump.addEventListener("pointerdown", jumpDown);
@@ -104,4 +110,5 @@ export function resetInput() {
   input.left = false;
   input.right = false;
   input.jump = false;
+  input.jumpHeld = false;
 }

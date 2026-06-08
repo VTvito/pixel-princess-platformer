@@ -103,9 +103,21 @@ export const FINALE = {
 // Platformer tunables (spec §2). Centralised so entity/level code stays free of magic
 // numbers and difficulty is easy to tweak. Units: px and px/s.
 export const PHYSICS = {
-  GRAVITY: 1800,    // downward acceleration (px/s²)
-  MOVE_SPEED: 320,  // horizontal run speed (px/s)
-  JUMP_FORCE: 730,  // initial upward velocity on jump (px/s); a snappy hop that clears thorns + 2-cell ravines without overshooting
+  GRAVITY: 1800,    // base downward acceleration (px/s²)
+  // Horizontal feel: instead of an instant on/off velocity, the player ramps a private vx
+  // toward a target at ACCEL (turning/starting) or DECEL (releasing), with reduced control
+  // in the air (AIR_ACCEL). This gives inertia/slide without changing the top speed.
+  RUN_SPEED: 320,   // target horizontal run speed (px/s) — preserves the old MOVE_SPEED reach
+  ACCEL: 2600,      // ground ramp toward the target (px/s²)
+  DECEL: 3200,      // ground friction when no direction is held (px/s²)
+  AIR_ACCEL: 1600,  // reduced air control (px/s²)
+  // Vertical feel: a snappy hop with variable height (release early = lower) and a faster
+  // fall than rise (asymmetric arc, Mario-style), plus small forgiveness windows.
+  JUMP_FORCE: 730,  // initial upward velocity on jump (px/s); clears thorns + 2-cell ravines
+  JUMP_CUT: 0.45,   // vel.y multiplier applied once if jump is released while still rising
+  FALL_MULT: 1.6,   // extra gravity factor while descending (asymmetric arc)
+  COYOTE_TIME: 0.1, // grace window (s) to still jump just after leaving a ledge
+  JUMP_BUFFER: 0.1, // window (s) a jump press is remembered before landing
 };
 
 // Asset manifest — the swap point. Replace files in /assets and, if an extension

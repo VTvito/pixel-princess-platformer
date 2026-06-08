@@ -62,32 +62,67 @@ export function makePlayer(char, pos, skinKeys = []) {
   player.squashY = 1;
   let wasGrounded = true;
 
+  // Movement feel state (spec §1). vx is a private horizontal velocity that ramps toward a
+  // target so motion has inertia/slide instead of snapping on/off. The timers give small
+  // forgiveness windows (coyote = jump just after a ledge, buffer = jump pressed just before
+  // landing); jumpCut ensures the variable-height cut is applied at most once per jump.
+  player.vx = 0;
+  let sinceGrounded = 0;
+  let sinceJumpPressed = Infinity;
+  let jumpCut = true;
+
   player.onUpdate(() => {
     const input = getInput();
+    const dt = k.dt();
 
-    // Horizontal movement (held). move() is framerate-independent (px/s).
+    // Horizontal movement with acceleration. Pick a target speed from input, then ramp vx
+    // toward it: brisk on the ground (ACCEL/DECEL), softer in the air (AIR_ACCEL).
+    let target = 0;
     if (input.left && !input.right) {
-      player.move(-PHYSICS.MOVE_SPEED, 0);
+      target = -PHYSICS.RUN_SPEED;
       player.facing = -1;
     } else if (input.right && !input.left) {
-      player.move(PHYSICS.MOVE_SPEED, 0);
+      target = PHYSICS.RUN_SPEED;
       player.facing = 1;
     }
+    const groundedNow = player.isGrounded();
+    const rate = groundedNow ? (target !== 0 ? PHYSICS.ACCEL : PHYSICS.DECEL) : PHYSICS.AIR_ACCEL;
+    const step = rate * dt;
+    player.vx += Math.max(-step, Math.min(step, target - player.vx)); // ramp, clamped per frame
+    player.move(player.vx, 0); // framerate-independent (px/s)
+
     // Face travel direction (sprites authored facing right). Skin layers must flip too —
     // flipX is not inherited from the parent transform.
     player.flipX = player.facing === -1;
     player.skinLayers.forEach((layer) => (layer.flipX = player.flipX));
 
-    // Jump: edge-triggered and only from the ground (no double-jump).
-    if (consumeJump() && player.isGrounded()) {
+    // Jump with coyote time + input buffering. Remember the most recent press, and allow a
+    // jump if we're grounded (or within the coyote window of having been).
+    sinceGrounded = groundedNow ? 0 : sinceGrounded + dt;
+    sinceJumpPressed = consumeJump() ? 0 : sinceJumpPressed + dt;
+    if (sinceJumpPressed <= PHYSICS.JUMP_BUFFER && (groundedNow || sinceGrounded <= PHYSICS.COYOTE_TIME)) {
       player.jump(PHYSICS.JUMP_FORCE);
       sfx("jump");
       player.squashX = 0.9; // stretch tall on take-off
       player.squashY = 1.18;
+      sinceJumpPressed = Infinity; // consume the buffered press
+      sinceGrounded = Infinity; // prevent an immediate second jump via coyote
+      jumpCut = false; // arm the variable-height cut for this jump
+    }
+
+    // Variable jump height: if the button is released while still rising, cut the upward
+    // velocity once so a tap gives a short hop and a hold gives the full arc.
+    if (!input.jumpHeld && player.vel.y < 0 && !jumpCut) {
+      player.vel.y *= PHYSICS.JUMP_CUT;
+      jumpCut = true;
+    }
+    // Faster fall than rise for a snappier, less floaty arc.
+    if (player.vel.y > 0) {
+      player.vel.y += (PHYSICS.FALL_MULT - 1) * PHYSICS.GRAVITY * dt;
     }
 
     // Landing impact: airborne -> grounded this frame.
-    const grounded = player.isGrounded();
+    const grounded = groundedNow;
     if (grounded && !wasGrounded) {
       player.squashX = 1.1; // squash wide on land
       player.squashY = 0.82;
