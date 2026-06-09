@@ -122,8 +122,16 @@ export const PHYSICS = {
 // Points (spec: Mario-style scoring). A collected pickup and a stomped enemy each add to the
 // running journey score (src/state.js), shown in the HUD and the end-of-level reward.
 export const SCORE = {
-  PICKUP: 100, // golden apple / pearl / lantern / crystal
-  STOMP: 200,  // defeating an enemy by jumping on it
+  PICKUP: 100,   // golden apple / pearl / lantern / crystal
+  STOMP: 200,    // defeating an enemy by jumping on it
+  POWERUP: 300,  // grabbing a star
+};
+
+// Power-up: a star grants a short window of invincibility — hazards and enemies can't hurt
+// the heroine, and simply touching an enemy defeats it (Mario "star" power). A fall into a
+// ravine still ends the run.
+export const POWERUP = {
+  DURATION: 7, // seconds of invincibility per star
 };
 
 // Asset manifest — the swap point. Replace files in /assets and, if an extension

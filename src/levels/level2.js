@@ -41,6 +41,13 @@ export const LEVEL_2 = {
   map: composeMap({
     width: 120,
     ravines: [{ x: 22, w: 2 }, { x: 46, w: 2 }, { x: 70, w: 2 }, { x: 94, w: 2 }],
+    // Floating bridges over three ravines (row 8 / LANE) so the bonus pearls above are
+    // reachable; a robust hop, off the running head's path (see level1.js for the geometry).
+    platforms: [
+      { x: 46, y: LANE, w: 2 },
+      { x: 70, y: LANE, w: 2 },
+      { x: 94, y: LANE, w: 2 },
+    ],
     items: [
       { x: 2, y: LANE, ch: "@" },
       { x: 116, y: LANE, ch: ">" },
@@ -50,10 +57,13 @@ export const LEVEL_2 = {
       { x: 58, y: LANE, ch: "^" },
       { x: 82, y: LANE, ch: "c" },
       { x: 106, y: LANE, ch: "^" },
+      // Star power-up before the first crab — plough straight through the patrol.
+      { x: 28, y: LANE, ch: "*" },
       ...arcCollectibles([8, 16, 24, 30, 40, 48, 54, 64, 72, 78, 88, 96, 102, 112]),
-      { x: 26, y: 4, ch: "o" },
-      { x: 66, y: 4, ch: "o" },
-      { x: 98, y: 4, ch: "o" },
+      // Bonus pearls above the ravine bridges (row 5), grabbed with a hop up.
+      { x: 46, y: 5, ch: "o" },
+      { x: 70, y: 5, ch: "o" },
+      { x: 94, y: 5, ch: "o" },
     ],
   }),
 };

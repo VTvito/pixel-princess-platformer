@@ -70,6 +70,8 @@ export const LEVEL_1 = {
       { x: 58, y: LANE, ch: "^" },
       { x: 82, y: LANE, ch: "^" },
       { x: 106, y: LANE, ch: "^" },
+      // Star power-up on the lane (grabbed while running): a taste of invincibility.
+      { x: 40, y: LANE, ch: "*" },
       // Apples along the run + over the ravines (grabbed mid-jump). Rows 6–7 are above the
       // row-8 bridges, so nothing overwrites a platform cell.
       ...arcCollectibles([8, 16, 22, 30, 40, 46, 54, 62, 70, 78, 88, 94, 102, 110]),

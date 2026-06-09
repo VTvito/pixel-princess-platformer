@@ -42,6 +42,12 @@ export const LEVEL_4 = {
   map: composeMap({
     width: 120,
     ravines: [{ x: 22, w: 2 }, { x: 46, w: 2 }, { x: 70, w: 2 }, { x: 94, w: 2 }],
+    // Floating bridges over two ravines (row 8 / LANE) so the bonus crystals above are
+    // reachable (see level1.js for the geometry); clear of the stalactite columns.
+    platforms: [
+      { x: 46, y: LANE, w: 2 },
+      { x: 70, y: LANE, w: 2 },
+    ],
     items: [
       { x: 2, y: LANE, ch: "@" },
       { x: 116, y: LANE, ch: ">" },
@@ -51,9 +57,12 @@ export const LEVEL_4 = {
       { x: 60, y: 3, ch: "s" },
       { x: 84, y: 3, ch: "s" },
       { x: 108, y: 3, ch: "s" },
+      // Star power-up early on — shrug off a couple of stalactite drops.
+      { x: 26, y: LANE, ch: "*" },
       ...arcCollectibles([8, 18, 28, 38, 50, 62, 74, 86, 98, 110]),
-      { x: 30, y: 4, ch: "o" },
-      { x: 78, y: 4, ch: "o" },
+      // Bonus crystals above the ravine bridges (row 5).
+      { x: 46, y: 5, ch: "o" },
+      { x: 70, y: 5, ch: "o" },
     ],
   }),
 };

@@ -43,6 +43,13 @@ export const LEVEL_3 = {
   map: composeMap({
     width: 120,
     ravines: [{ x: 22, w: 2 }, { x: 46, w: 2 }, { x: 70, w: 2 }, { x: 94, w: 2 }],
+    // Floating bridges over three ravines (row 8 / LANE) so the bonus lanterns above are
+    // reachable (see level1.js for the geometry); clear of the flyers' flat patrol stretches.
+    platforms: [
+      { x: 46, y: LANE, w: 2 },
+      { x: 70, y: LANE, w: 2 },
+      { x: 94, y: LANE, w: 2 },
+    ],
     items: [
       { x: 2, y: LANE, ch: "@" },
       { x: 116, y: LANE, ch: ">" },
@@ -53,10 +60,13 @@ export const LEVEL_3 = {
       // Flyers over flat ground (no spike/ravine beneath) so running under them is safe.
       { x: 34, y: AIR, ch: "f" },
       { x: 82, y: AIR, ch: "f" },
+      // Star power-up before the first flyer.
+      { x: 28, y: LANE, ch: "*" },
       ...arcCollectibles([8, 16, 24, 30, 40, 48, 54, 64, 72, 78, 88, 96, 102, 112]),
-      { x: 26, y: 4, ch: "o" },
-      { x: 66, y: 4, ch: "o" },
-      { x: 98, y: 4, ch: "o" },
+      // Bonus lanterns above the ravine bridges (row 5).
+      { x: 46, y: 5, ch: "o" },
+      { x: 70, y: 5, ch: "o" },
+      { x: 94, y: 5, ch: "o" },
     ],
   }),
 };

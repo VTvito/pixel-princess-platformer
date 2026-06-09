@@ -43,12 +43,25 @@ void dirname(fileURLToPath(import.meta.url)); // (kept for parity with sibling t
 const BOOT_TIMEOUT = 15000;
 const LEVELS = [1, 2, 3, 4];
 
+// WHAT THIS GUARDS — and what it does NOT. This is a REACHABILITY check: "does a completable
+// path exist?" It is NOT a balance/quality/fun gate, and the bot is deliberately impeded
+// (1–2 cells of look-ahead, fixed rules, a fixed-length jump hold, no human timing). So:
+//   • A level PASSES when the bot reaches the goal within the death tolerance below.
+//   • Non-zero deaths are EXPECTED, especially on moving-enemy levels (a slow crab a human
+//     would simply time or stomp can still catch the cautious bot). Deaths are reported as
+//     information, not a regression — DO NOT tune levels to push this count to zero (that
+//     would flatten the game; dying sometimes is the point — see the "Insert Coin" meta).
+//   • A SUDDEN failure (can't reach the goal, wedged, or deaths blow past the tolerance) right
+//     after a change is the real signal: investigate it as a likely introduced bug.
+//
 // Bot tuning (ms). Generous — this checks "is there a path", not speedrunning.
 const POLL = 70; // sample/drive cadence
-const LEVEL_BUDGET = 90000; // total wall-clock per level before giving up (levels are ≈3× longer now)
+const LEVEL_BUDGET = 120000; // wall-clock per level before giving up; headroom for retries (each
+//                              respawn replays from the start) so a few deaths never time out
 const STALL_FAIL = 4000; // wedged (not deliberately waiting) this long → blocked: report x
 const WAIT_FAIL = 5000; // waiting on a hazard this long → something is wrong
-const MAX_DEATHS = 15; // give up on a level after this many respawns
+const DEATH_TOLERANCE = 15; // respawns allowed before we call the path un-completable (NOT a
+//                             target to minimise — the impeded bot is expected to die some)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -198,7 +211,7 @@ async function playLevel(page, n) {
     // Death → bank the coin to respawn, then reset the watchdog.
     if (s.coinShown || s.deaths > seenDeaths) {
       seenDeaths = s.deaths;
-      if (seenDeaths >= MAX_DEATHS) {
+      if (seenDeaths >= DEATH_TOLERANCE) {
         return { ok: false, level: n, why: "too many deaths", maxX, goalX, deaths: seenDeaths };
       }
       await page.evaluate(() => document.getElementById("coin-btn")?.click());

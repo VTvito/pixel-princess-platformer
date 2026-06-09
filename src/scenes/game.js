@@ -12,6 +12,7 @@ import {
   CHARACTERS,
   PHYSICS,
   SCORE,
+  POWERUP,
   MAX_LEVEL,
   unlockedSkinKeys,
   skinUnlockedBy,
@@ -102,6 +103,10 @@ export function registerGameScene() {
     // (skins persist, since they're derived from the saved level in state — not reset here).
     let finished = false;
     let dead = false;
+    // Star power-up: while invincible, hazards/enemies can't hurt the heroine and touching an
+    // enemy defeats it. A fall off the world still ends the run (handled in die's callers).
+    let invincibleUntil = 0;
+    const isInvincible = () => k.time() < invincibleUntil;
     function die() {
       if (finished || dead) return;
       dead = true;
@@ -119,25 +124,57 @@ export function registerGameScene() {
     player.onUpdate(() => {
       if (!finished && !dead && player.pos.y > worldH + 120) die();
     });
-    // Touched a static hazard (thorns / urchins / icicle) → always respawn.
+    // Touched a static hazard (thorns / urchins / icicle) → respawn, unless star-invincible.
     player.onCollide("hazard", () => {
-      if (!finished && !dead) die();
+      if (!finished && !dead && !isInvincible()) die();
     });
-    // Moving enemy (crab / flyer): Mario-style stomp. Coming DOWN onto it from above defeats
-    // the enemy with a hop + points; any other contact (side / from below) still respawns.
+    // Moving enemy (crab / flyer). While star-invincible, any contact plows through it for
+    // points. Otherwise Mario-style stomp: coming DOWN onto it from above defeats it with a
+    // hop + points; any other contact (side / from below) respawns.
     player.onCollide("enemy", (enemy) => {
       if (finished || dead) return;
       const stomping = player.vel.y > 60 && player.pos.y < enemy.pos.y;
-      if (stomping) {
+      if (isInvincible() || stomping) {
         confettiBurst(enemy.pos, [theme.collectible, PALETTE.cream, PALETTE.gold]);
-        sfx("jump"); // springy bounce off the foe
+        sfx("jump"); // springy bounce / plough-through
         k.destroy(enemy);
-        player.vel.y = -PHYSICS.STOMP_BOUNCE; // bounce back up
+        if (stomping) player.vel.y = -PHYSICS.STOMP_BOUNCE; // bounce back up off a stomp
         bumpScore(SCORE.STOMP);
       } else {
         die();
       }
     });
+    // Star power-up: grant a window of invincibility + points, with a pulsing aura on the
+    // heroine for feedback. Re-grabbing simply refreshes the timer.
+    player.onCollide("powerup", (star) => {
+      if (finished || dead) return;
+      confettiBurst(star.pos, [PALETTE.gold, PALETTE.cream, theme.collectible]);
+      sfx("coin");
+      k.destroy(star);
+      invincibleUntil = k.time() + POWERUP.DURATION;
+      bumpScore(SCORE.POWERUP);
+      spawnInvincibleAura();
+    });
+    // The aura that trails the heroine while a star is active (one at a time).
+    function spawnInvincibleAura() {
+      if (k.get("inv-aura").length) return; // already showing; the timer was just refreshed
+      const aura = k.add([
+        k.circle(42),
+        k.pos(player.pos),
+        k.anchor("center"),
+        k.color(...PALETTE.gold),
+        k.opacity(0),
+        k.z(9), // just behind the heroine (z 10)
+        "inv-aura",
+      ]);
+      aura.onUpdate(() => {
+        if (!isInvincible()) return k.destroy(aura);
+        aura.pos = player.pos;
+        const pulse = 0.5 + 0.5 * Math.sin(k.time() * 12);
+        aura.opacity = 0.16 + 0.2 * pulse;
+        aura.radius = 38 + 8 * pulse;
+      });
+    }
 
     // --- HUD (fixed; ignores the camera) ---
     k.add([k.text(char.name, { size: 28 }), k.pos(24, 18), k.color(...hudColor), k.fixed(), k.z(50)]);
@@ -170,6 +207,21 @@ export function registerGameScene() {
       addScore(amount);
       scoreLabel.text = `★ ${getScore()}`;
     };
+    // Invincibility indicator (top centre): shown only while a star is active, counting down.
+    const invLabel = k.add([
+      k.text("", { size: 24 }),
+      k.pos(GAME_W / 2, 30),
+      k.anchor("center"),
+      k.color(...PALETTE.gold),
+      k.fixed(),
+      k.z(50),
+    ]);
+    invLabel.hidden = true;
+    k.onUpdate(() => {
+      const active = isInvincible();
+      invLabel.hidden = !active;
+      if (active) invLabel.text = `★ INVINCIBILE  ${Math.ceil(invincibleUntil - k.time())}`;
+    });
 
     // --- Collectibles (golden apples / pearls) ---
     let collected = 0;

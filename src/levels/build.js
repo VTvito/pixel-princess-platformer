@@ -4,8 +4,8 @@
 // needs to wire gameplay (spawn point, world size, collectible count). Collisions, HUD and
 // respawn live in the scene; this file just builds the world.
 //
-// Tile legend: "=" solid  "^" hazard (thorns/urchins)  "o" collectible  "c" crab enemy
-//              "f" flyer enemy (air)  "s" stalactite hazard (falls)
+// Tile legend: "=" solid  "^" hazard (thorns/urchins)  "o" collectible  "*" star power-up
+//              "c" crab enemy  "f" flyer enemy (air)  "s" stalactite hazard (falls)
 //              "@" spawn   ">" goal   " " air (a gap in the ground rows is a ravine)
 
 import { k } from "../kaplayCtx.js";
@@ -61,6 +61,9 @@ export function buildLevel(def) {
         case "o":
           makeCollectible(x + TILE / 2, y + TILE / 2, theme);
           collectiblesTotal += 1;
+          break;
+        case "*":
+          makePowerup(x + TILE / 2, y + TILE / 2);
           break;
         case "c":
           makeCrab(x + TILE / 2, y + TILE / 2, theme);
@@ -144,6 +147,49 @@ function makeCollectible(cx, cy, theme) {
     halo.opacity = 0.12 + 0.12 * (0.5 + 0.5 * Math.sin(item.t * 1.6)); // gentle flicker
   });
   return item;
+}
+
+// --- Star power-up: a bobbing, spinning golden star, tagged "powerup". Grabbing it grants a
+// short invincibility window (handled in the game scene). Drawn from primitives (a 5-point
+// star polygon + a warm halo) so it needs no art asset and reads the same in every theme.
+function starPoints(outer, inner) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = -Math.PI / 2 + (i * Math.PI) / 5; // start at the top, 36° steps
+    pts.push(k.vec2(Math.cos(a) * r, Math.sin(a) * r));
+  }
+  return pts;
+}
+
+function makePowerup(cx, cy) {
+  const star = k.add([
+    k.polygon(starPoints(17, 7.5)),
+    k.pos(cx, cy),
+    k.anchor("center"),
+    k.color(...PALETTE.gold),
+    k.area({ scale: 1.1 }), // slightly generous pickup (casual)
+    k.rotate(0),
+    k.z(3),
+    "powerup",
+    { baseY: cy, t: k.rand(0, Math.PI * 2) },
+  ]);
+  // Warm aura behind the star so it reads as "special" (more than a plain collectible).
+  const halo = star.add([
+    k.circle(22),
+    k.color(...PALETTE.gold),
+    k.anchor("center"),
+    k.pos(0, 0),
+    k.opacity(0.18),
+    k.z(2),
+  ]);
+  star.onUpdate(() => {
+    star.t += k.dt() * 3;
+    star.pos.y = star.baseY + Math.sin(star.t) * 6; // bob
+    star.angle = Math.sin(star.t * 0.6) * 14; // gentle wobble-spin
+    halo.opacity = 0.14 + 0.14 * (0.5 + 0.5 * Math.sin(star.t * 2)); // pulse
+  });
+  return star;
 }
 
 // --- Crab enemy: patrols horizontally, tagged "enemy". Primitive art (no asset needed).
