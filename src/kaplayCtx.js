@@ -2,7 +2,9 @@
 // Every other module imports `k` from here, so there is exactly one engine instance
 // and no global (window) pollution.
 
-import kaplay from "https://unpkg.com/kaplay@3001.0.19/dist/kaplay.mjs";
+// Kaplay is vendored (pinned 3001.0.19, downloaded from unpkg) so production never
+// depends on a CDN being up, and the game can later work offline as a PWA.
+import kaplay from "../vendor/kaplay-3001.0.19.mjs";
 import { GAME_W, GAME_H, PALETTE } from "./config.js";
 
 export const k = kaplay({

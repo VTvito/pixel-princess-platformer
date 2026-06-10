@@ -29,19 +29,37 @@
 // sibling smoke.mjs / levels.mjs.
 //
 // Usage:
-//   python tools/serve.py 8137      # one terminal (or: npm run serve)
-//   node tools/test/play.mjs        # another (or: npm run test:play)
+//   python tools/serve.py 8137                  # one terminal (or: npm run serve)
+//   node tools/test/play.mjs                    # another (or: npm run test:play)
+//   node tools/test/play.mjs --levels 2,3       # only some levels — cheap while iterating
+//   PJ_LEVELS=4 node tools/test/play.mjs        # same, via env
 //
-// Exit code 0 = every level reached its goal; 1 = at least one was unreachable.
+// Exit code 0 = every requested level reached its goal; 1 = at least one was unreachable.
 
 import { launchBrowser, routeVendorKaplay } from "./browser.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
-const TARGET = process.argv[2] || process.env.PJ_URL || "http://localhost:8137";
+// Args: an optional target URL and an optional --levels filter, in any order.
+const args = process.argv.slice(2);
+let urlArg = null;
+let levelsArg = process.env.PJ_LEVELS || null;
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--levels") levelsArg = args[++i];
+  else if (args[i].startsWith("--levels=")) levelsArg = args[i].slice("--levels=".length);
+  else urlArg = args[i];
+}
+const TARGET = urlArg || process.env.PJ_URL || "http://localhost:8137";
 void dirname(fileURLToPath(import.meta.url)); // (kept for parity with sibling tests)
 const BOOT_TIMEOUT = 15000;
-const LEVELS = [1, 2, 3, 4];
+const ALL_LEVELS = [1, 2, 3, 4];
+const LEVELS = levelsArg
+  ? levelsArg.split(",").map((s) => Number(s.trim())).filter((n) => ALL_LEVELS.includes(n))
+  : ALL_LEVELS;
+if (LEVELS.length === 0) {
+  console.error(`FAIL — no valid levels in "${levelsArg}" (expected e.g. --levels 2,3 with levels 1-4)`);
+  process.exit(2);
+}
 
 // WHAT THIS GUARDS — and what it does NOT. This is a REACHABILITY check: "does a completable
 // path exist?" It is NOT a balance/quality/fun gate, and the bot is deliberately impeded
@@ -212,7 +230,7 @@ async function playLevel(page, n) {
     if (s.coinShown || s.deaths > seenDeaths) {
       seenDeaths = s.deaths;
       if (seenDeaths >= DEATH_TOLERANCE) {
-        return { ok: false, level: n, why: "too many deaths", maxX, goalX, deaths: seenDeaths };
+        return { ok: false, level: n, why: "too many deaths", maxX, goalX, deaths: seenDeaths, ms: Date.now() - t0 };
       }
       await page.evaluate(() => document.getElementById("coin-btn")?.click());
       await page
@@ -234,7 +252,7 @@ async function playLevel(page, n) {
         waiting += POLL;
         stall = 0;
         if (waiting >= WAIT_FAIL) {
-          return { ok: false, level: n, why: "stuck waiting on a hazard", maxX, goalX, deaths: s.deaths, stuckX: lastX2 };
+          return { ok: false, level: n, why: "stuck waiting on a hazard", maxX, goalX, deaths: s.deaths, stuckX: lastX2, ms: Date.now() - t0 };
         }
       } else {
         waiting = 0;
@@ -242,13 +260,13 @@ async function playLevel(page, n) {
         else stall += POLL;
         lastX = s.x;
         if (stall >= STALL_FAIL) {
-          return { ok: false, level: n, why: "stuck", maxX, goalX, deaths: s.deaths, stuckX: lastX2 };
+          return { ok: false, level: n, why: "stuck", maxX, goalX, deaths: s.deaths, stuckX: lastX2, ms: Date.now() - t0 };
         }
       }
     }
     await sleep(POLL);
   }
-  return { ok: false, level: n, why: "timeout", maxX, goalX, deaths: seenDeaths, stuckX: lastX2 };
+  return { ok: false, level: n, why: "timeout", maxX, goalX, deaths: seenDeaths, stuckX: lastX2, ms: Date.now() - t0 };
 }
 
 const browser = await launchBrowser();
@@ -273,8 +291,8 @@ try {
       failed = true;
       const at = r.stuckX != null ? `, wedged near x=${Math.round(r.stuckX)}` : "";
       console.log(
-        `FAIL — Livello ${n}: ${r.why} — progress ${pct}% (x=${Math.round(r.maxX)}/${Math.round(r.goalX ?? 0)})` +
-          `${at}, ${r.deaths} death(s)`,
+        `FAIL — Livello ${n}: ${r.why} after ${(r.ms / 1000).toFixed(1)}s — progress ${pct}% ` +
+          `(x=${Math.round(r.maxX)}/${Math.round(r.goalX ?? 0)})${at}, ${r.deaths} death(s)`,
       );
     }
   }
@@ -284,7 +302,7 @@ try {
     console.error("\nconsole/page errors:\n  " + errors.join("\n  "));
   }
   if (failed) throw new Error("one or more levels were not completable");
-  console.log("\nAll 4 levels are completable by the autoplay bot.");
+  console.log(`\nAll ${LEVELS.length} requested level(s) are completable by the autoplay bot.`);
 } catch (err) {
   console.error(`\nFAIL — ${err.message}`);
   console.error(`       (is the server up? run: python tools/serve.py 8137)`);

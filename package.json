@@ -5,7 +5,8 @@
   "description": "Personalized 2D platformer (Kaplay, no build step). This package.json exists ONLY for the dev-time browser test harness; the game itself loads Kaplay from a CDN and needs no install/build.",
   "scripts": {
     "serve": "python tools/serve.py 8137",
-    "test": "node tools/test/smoke.mjs",
+    "gen": "node tools/gen-placeholders.mjs",
+    "test": "node tools/test/smoke.mjs && node tools/test/features.mjs && node tools/test/levels.mjs",
     "test:smoke": "node tools/test/smoke.mjs",
     "test:features": "node tools/test/features.mjs",
     "test:levels": "node tools/test/levels.mjs",
