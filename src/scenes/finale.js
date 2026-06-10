@@ -7,7 +7,7 @@
 import { k } from "../kaplayCtx.js";
 import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE } from "../config.js";
 import { getSelectedCharacter, getCoccoline } from "../state.js";
-import { addSkinLayers } from "../entities/player.js";
+import { addSkinLayers, syncSkins } from "../entities/player.js";
 import { resetInput } from "../controls.js";
 import { showReceipt, hideReceipt } from "../ui/receipt.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
@@ -50,9 +50,12 @@ export function registerFinaleScene() {
       "avatar",
     ]);
     avatar.skinLayers = addSkinLayers(avatar, SKINS.map((s) => s.key));
-    // Gentle idle bob; children inherit the parent's position, so the skins follow.
+    avatar.play("celebrate"); // arms raised — she made it
+    // Gentle idle bob; children inherit the parent's position, so the skins follow —
+    // but the sheet frame does not, so mirror it every update (see animspec.js).
     avatar.onUpdate(() => {
       avatar.pos.y = baseY + Math.sin(k.time() * 1.5) * 6;
+      syncSkins(avatar);
     });
 
     // Caption above the heroine. The crown is its own object with NO color tint, so it

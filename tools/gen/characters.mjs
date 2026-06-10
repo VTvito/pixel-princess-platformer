@@ -1,22 +1,15 @@
 // characters.mjs — pixel-art heroines + clothing skins, authored at 16×24 native
-// (×4 → the 64×96 canvas the runtime expects, see src/entities/player.js).
+// (×4 → the 64×96 cells the runtime expects, see src/entities/player.js).
 //
-// The painter is POSE-PARAMETERIZED: every drawing decision that animation will move
-// (head bob, torso lean, leg split, arm swing, hair sway, skirt flare) reads from a pose
-// record. Phase 1 emits only the neutral standing pose; Phase 2 will emit multi-frame
-// sheets by calling the same painters with a pose per frame — body and skins consume the
-// SAME record for the same frame index, so the overlay layers can never drift from the
-// body animation.
-//
-// Anatomy (native y, neutral pose) — the shared contract between body and skin painters:
-//   y0-1  crown zone (empty on the body; the crown skin draws here)
-//   y2-8  hair + head (eyes y6, blush y7, mouth y8)
-//   y9    neck (necklace skin)
-//   y10-15 torso (bodice skin covers y10-13)
-//   y14-19 skirt zone (skirt skin)
-//   y16-20 legs   y21-22 shoes   y23 left for the bottom outline
+// ANIMATION BY SHARED POSE RECORDS: every drawing decision that animation moves (head
+// bob, leg stride, arm swing, hair sway/lift, skirt flare, blink, …) reads from a pose
+// record, and FRAME_POSES defines one record per sheet cell (16 cells, layout + anim
+// ranges in src/animspec.js). The body painter AND every skin painter consume the same
+// record for the same frame index, so the runtime overlay layers (which mirror the
+// parent's frame each update) are in sync by construction — drift is impossible.
 
-import { newImg, pset, fillRect, fillTrap, outline } from "./px.mjs";
+import { newImg, pset, fillRect, fillTrap, blit, outline } from "./px.mjs";
+import { SHEET } from "../../src/animspec.js";
 
 export const BODY_W = 16;
 export const BODY_H = 24;
@@ -25,41 +18,79 @@ const CX = 8; // body is symmetric around columns 7-8
 const SKIN = [243, 207, 178];
 const SKIN_SHADE = [216, 176, 148];
 const EYE = [44, 36, 50];
+const LASH = [150, 110, 90]; // closed-eye line (blink / hurt)
 const BLUSH = [233, 150, 160];
 const MOUTH = [176, 88, 92];
 const OUT = [38, 30, 42]; // shared dark contour so layered art reads as one figure
 
-// The neutral standing pose — the single source every Phase-1 frame uses. Phase 2 varies
-// these fields per frame (run cycle, jump tuck, …) without touching the painters.
-export const NEUTRAL_POSE = {
-  headBob: 0, // +down (px): breathing / run bounce
-  lean: 0, // torso lean, +right (px)
-  legSplit: 0, // run stride: legs apart by this many px (0 = standing)
-  armSwing: 0, // arm offset, +forward (px)
-  hairSway: 0, // lock sway, +right (px)
-  skirtFlare: 0, // extra skirt hem half-width (px)
+// One record per animation-relevant dimension. All fields are native-pixel offsets.
+const POSE = {
+  headBob: 0, // +down: breathing / run bounce (head, necklace, crown follow)
+  lean: 0, // torso lean, +forward (torso, arms, bodice follow)
+  legLx: 0, // left-leg x offset (+forward when facing right)
+  legRx: 0, // right-leg x offset
+  legLy: 0, // left-foot lift (+up)
+  legRy: 0, // right-foot lift
+  tuck: 0, // shorten legs by this much (jump tuck)
+  armSwing: 0, // opposite arm swing (run) / spread (air)
+  armsUp: false, // both arms raised (celebrate)
+  hairSway: 0, // lock sway, +trailing
+  hairLift: 0, // locks ride up (falling)
+  skirtFlare: 0, // extra skirt hem half-width (skirt skin reads this)
+  blink: false,
+  hurt: false, // closed eyes + open mouth
 };
 
+const pose = (p) => ({ ...POSE, ...p });
+
+// Sheet cells, indexed to match ANIMS in src/animspec.js.
+export const FRAME_POSES = [
+  // 0-3 idle: gentle breath, one blink
+  pose({}),
+  pose({ headBob: 1 }),
+  pose({ headBob: 1, blink: true }),
+  pose({ headBob: 0 }),
+  // 4-9 run: 6-frame stride (contact → pass → cross, both sides)
+  pose({ legLx: 2, legRx: -2, legRy: 1, armSwing: 1, hairSway: -1, skirtFlare: 1 }),
+  pose({ legLx: 1, legRx: -1, headBob: 1, armSwing: 1, hairSway: -1 }),
+  pose({ headBob: 1, hairSway: -1 }),
+  pose({ legLx: -2, legRx: 2, legLy: 1, armSwing: -1, hairSway: -1, skirtFlare: 1 }),
+  pose({ legLx: -1, legRx: 1, headBob: 1, armSwing: -1, hairSway: -1 }),
+  pose({ headBob: 1, hairSway: -1 }),
+  // 10 jump (rising): tucked legs, slight spread of the arms
+  pose({ tuck: 2, legLx: -1, legRx: 1, armSwing: 2, skirtFlare: 1 }),
+  // 11 fall: legs reaching down, hair + skirt riding up
+  pose({ legRy: 1, armSwing: 2, hairLift: 2, hairSway: -1, skirtFlare: 2 }),
+  // 12 hurt: the "ops" pose behind the Insert Coin overlay
+  pose({ headBob: 1, hurt: true, hairSway: 1 }),
+  // 13-14 celebrate: arms up, little hop
+  pose({ armsUp: true, skirtFlare: 1 }),
+  pose({ armsUp: true, headBob: -1, skirtFlare: 1, hairSway: 1 }),
+  // 15 spare (blank cell)
+  null,
+];
+
 /**
- * Paint one heroine body on a transparent 16×24 canvas.
+ * Paint one heroine body on a transparent 16×24 canvas, in the given pose.
  * @param {{hair:number[], top:number[], legs:number[], shoes:number[], hairLen:number,
  *          quilt?:boolean}} look  per-character colors; quilt = puffer-jacket seams (Anna)
- * @param {typeof NEUTRAL_POSE} pose
  */
-export function paintHeroine(look, pose = NEUTRAL_POSE) {
+export function paintHeroine(look, p = POSE) {
   const img = newImg(BODY_W, BODY_H);
-  const hb = pose.headBob;
-  const lean = pose.lean;
+  const hb = p.headBob;
+  const lean = p.lean;
   const hairDark = look.hair.map((v) => Math.round(v * 0.74));
   const topDark = look.top.map((v) => Math.round(v * 0.78));
 
-  // Back hair: side locks falling from the head down to hairLen (style cue per character).
-  const lockBot = Math.min(22, look.hairLen);
-  fillRect(img, 3 + pose.hairSway, 6 + hb, 5 + pose.hairSway, lockBot, look.hair);
-  fillRect(img, 11 + pose.hairSway, 6 + hb, 13 + pose.hairSway, lockBot, look.hair);
+  // Back hair: side locks falling from the head down to hairLen, swaying/lifting with the
+  // pose (style cue per character).
+  const lockBot = Math.min(22, look.hairLen) - p.hairLift;
+  const sway = p.hairSway;
+  fillRect(img, 3 + sway, 6 + hb - p.hairLift, 5 + sway, lockBot, look.hair);
+  fillRect(img, 11 + sway, 6 + hb - p.hairLift, 13 + sway, lockBot, look.hair);
   // Shade the inner edge of the locks so they read as behind the body.
-  fillRect(img, 4 + pose.hairSway, 10 + hb, 5 + pose.hairSway, lockBot, hairDark);
-  fillRect(img, 11 + pose.hairSway, 10 + hb, 12 + pose.hairSway, lockBot, hairDark);
+  fillRect(img, 4 + sway, 10 + hb, 5 + sway, lockBot, hairDark);
+  fillRect(img, 11 + sway, 10 + hb, 12 + sway, lockBot, hairDark);
 
   // Torso (jacket / dress top), y10-15, leaning with the pose.
   fillRect(img, 5 + lean, 10, 11 + lean, 16, look.top);
@@ -70,19 +101,26 @@ export function paintHeroine(look, pose = NEUTRAL_POSE) {
   } else {
     fillRect(img, 5 + lean, 14, 11 + lean, 16, topDark); // simple waist shading
   }
-  // Arms: sleeves at the torso sides, hands in skin tone.
-  const swing = pose.armSwing;
-  fillRect(img, 4 + lean - swing, 10, 5 + lean - swing, 14, look.top);
-  fillRect(img, 11 + lean + swing, 10, 12 + lean + swing, 14, look.top);
-  pset(img, 4 + lean - swing, 14, SKIN);
-  pset(img, 11 + lean + swing, 14, SKIN);
+  // Arms: raised in celebration, otherwise sleeves at the torso sides swinging opposite.
+  if (p.armsUp) {
+    fillRect(img, 3 + lean, 6 + hb, 4 + lean, 11, look.top);
+    fillRect(img, 12 + lean, 6 + hb, 13 + lean, 11, look.top);
+    pset(img, 3 + lean, 5 + hb, SKIN);
+    pset(img, 12 + lean, 5 + hb, SKIN);
+  } else {
+    const swing = p.armSwing;
+    fillRect(img, 4 + lean + swing, 10, 5 + lean + swing, 14, look.top);
+    fillRect(img, 11 + lean - swing, 10, 12 + lean - swing, 14, look.top);
+    pset(img, 4 + lean + swing, 14, SKIN);
+    pset(img, 11 + lean - swing, 14, SKIN);
+  }
 
-  // Legs y16-20 (split by the pose for run frames), shoes y21-22.
-  const split = pose.legSplit;
-  fillRect(img, 5 - split, 16, 7 - split, 21, look.legs);
-  fillRect(img, 9 + split, 16, 11 + split, 21, look.legs);
-  fillRect(img, 4 - split, 21, 7 - split, 23, look.shoes);
-  fillRect(img, 9 + split, 21, 12 + split, 23, look.shoes);
+  // Legs y16-20 (strided / lifted / tucked by the pose), shoes under them.
+  const legTop = 16 + p.tuck;
+  fillRect(img, 5 + p.legLx, legTop, 7 + p.legLx, 21 - p.legLy, look.legs);
+  fillRect(img, 9 + p.legRx, legTop, 11 + p.legRx, 21 - p.legRy, look.legs);
+  fillRect(img, 4 + p.legLx, 21 - p.legLy, 7 + p.legLx, 23 - p.legLy, look.shoes);
+  fillRect(img, 9 + p.legRx, 21 - p.legRy, 12 + p.legRx, 23 - p.legRy, look.shoes);
 
   // Neck + head (skin), then the hair cap + fringe over it.
   fillRect(img, 7, 9 + hb, 9, 10 + hb, SKIN_SHADE); // neck, slightly shaded
@@ -92,13 +130,22 @@ export function paintHeroine(look, pose = NEUTRAL_POSE) {
   fillRect(img, 10, 3 + hb, 12, 9 + hb, look.hair); // right frame
   fillRect(img, 6, 4 + hb, 10, 5 + hb, look.hair); // fringe over the forehead
 
-  // Face: eyes, blush, a small smile.
-  pset(img, 6, 6 + hb, EYE);
-  pset(img, 9, 6 + hb, EYE);
+  // Face: eyes (open / blink / hurt), blush, mouth.
+  if (p.blink || p.hurt) {
+    pset(img, 6, 6 + hb, LASH);
+    pset(img, 9, 6 + hb, LASH);
+  } else {
+    pset(img, 6, 6 + hb, EYE);
+    pset(img, 9, 6 + hb, EYE);
+  }
   pset(img, 5, 7 + hb, BLUSH);
   pset(img, 10, 7 + hb, BLUSH);
-  pset(img, 7, 8 + hb, MOUTH);
-  pset(img, 8, 8 + hb, MOUTH);
+  if (p.hurt) {
+    fillRect(img, 7, 7 + hb, 9, 9 + hb, MOUTH); // little open "o"
+  } else {
+    pset(img, 7, 8 + hb, MOUTH);
+    pset(img, 8, 8 + hb, MOUTH);
+  }
 
   outline(img, OUT);
   return img;
@@ -108,20 +155,20 @@ export function paintHeroine(look, pose = NEUTRAL_POSE) {
  * Paint one clothing skin on the same 16×24 canvas, against the same pose, so the child
  * sprite overlays the body exactly (anatomy contract above).
  */
-export function paintSkin(kind, color, pose = NEUTRAL_POSE) {
+export function paintSkin(kind, color, p = POSE) {
   const img = newImg(BODY_W, BODY_H);
   const dark = color.map((v) => Math.round(v * 0.78));
-  const hb = pose.headBob;
-  const lean = pose.lean;
+  const hb = p.headBob;
+  const lean = p.lean;
   if (kind === "skirt") {
     // Royal skirt: hips → flared hem with a darker band and simple pleats.
-    const flare = 5 + pose.skirtFlare;
+    const flare = 5 + p.skirtFlare;
     fillTrap(img, 15, 20, CX + lean, 2.5, flare, color);
     fillRect(img, CX - flare + lean, 18, CX + flare + 1 + lean, 20, dark); // hem band
     for (let x = CX - flare + 2; x <= CX + flare - 1; x += 3) pset(img, x + lean, 19, color); // pleats
     outline(img, OUT);
   } else if (kind === "bodice") {
-    // Elegant bodice over the chest, with a lighter center lacing line.
+    // Elegant bodice over the chest, with a darker waist + lacing hints.
     fillRect(img, 5 + lean, 10, 11 + lean, 14, color);
     fillRect(img, 5 + lean, 13, 11 + lean, 14, dark);
     pset(img, 7 + lean, 11, dark);
@@ -143,6 +190,17 @@ export function paintSkin(kind, color, pose = NEUTRAL_POSE) {
     outline(img, OUT);
   }
   return img;
+}
+
+// Compose a full 8×2 sheet (one cell per FRAME_POSES entry) from a painter(pose) fn.
+export function buildSheet(paintFrame) {
+  const sheet = newImg(BODY_W * SHEET.cols, BODY_H * SHEET.rows);
+  FRAME_POSES.forEach((p, i) => {
+    if (!p) return; // spare cell stays transparent
+    const cell = paintFrame(p);
+    blit(sheet, cell, (i % SHEET.cols) * BODY_W, Math.floor(i / SHEET.cols) * BODY_H);
+  });
+  return sheet;
 }
 
 // Title mark: a bigger gold crown emblem on the same 16×24 canvas (ASSETS.sprites.logo).

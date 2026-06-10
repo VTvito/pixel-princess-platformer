@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { encodeScaled } from "./px.mjs";
-import { HEROINES, SKIN_LAYERS, paintHeroine, paintSkin, paintLogo } from "./characters.mjs";
+import { HEROINES, SKIN_LAYERS, paintHeroine, paintSkin, paintLogo, buildSheet } from "./characters.mjs";
 import {
   TILE_FRAMES, buildTileAtlas,
   paintApple, paintPearl, paintLantern, paintCrystal,
@@ -32,12 +32,13 @@ const writeSprite = (file, img) => {
   console.log("sprite ->", join("assets", "sprites", file));
 };
 
-// Heroines + the title crown (16×24 native → 64×96).
-for (const { file, look } of HEROINES) writeSprite(file, paintHeroine(look));
+// Heroines as 8×2 animation sheets (16×24 native cells → 64×96, layout in src/animspec.js).
+for (const { file, look } of HEROINES) writeSprite(file, buildSheet((p) => paintHeroine(look, p)));
 writeSprite("logo.png", paintLogo());
 
-// Clothing skins — same canvas, same pose, so the overlay layers line up (spec §3).
-for (const { file, kind, color } of SKIN_LAYERS) writeSprite(file, paintSkin(kind, color));
+// Clothing skins — same sheet layout, same pose records, so the overlay layers stay in
+// frame-sync with the body by construction (spec §3).
+for (const { file, kind, color } of SKIN_LAYERS) writeSprite(file, buildSheet((p) => paintSkin(kind, color, p)));
 
 // World sprites: collectibles, enemies, the goal portal.
 writeSprite("apple.png", paintApple());

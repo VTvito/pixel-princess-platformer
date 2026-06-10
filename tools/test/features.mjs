@@ -103,20 +103,27 @@ try {
     sfxMissing.length ? `missing: ${sfxMissing.join(",")}` : "7/7",
   );
 
-  // Movement (held key → Δx) and jump (apex Δy upward).
+  // Movement (held key → Δx) and jump (apex Δy upward), plus the animation state machine
+  // driven by the same physics (src/entities/player.js + src/animspec.js).
   const px = () => page.evaluate(() => window.__pj.k.get("player")[0].pos.x);
   const py = () => page.evaluate(() => window.__pj.k.get("player")[0].pos.y);
+  const anim = () => page.evaluate(() => window.__pj.k.get("player")[0].curAnim());
   const x0 = await px();
   await page.keyboard.down("ArrowRight");
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(250);
+  const runAnim = await anim(); // sampled while the key is still held
+  await page.waitForTimeout(150);
   await page.keyboard.up("ArrowRight");
   check("player moves right", (await px()) - x0 > 30, `dx=${((await px()) - x0).toFixed(1)}`);
+  check("run anim while moving", runAnim === "run", `anim=${runAnim}`);
 
   const yGround = await py();
   await page.keyboard.press("Space");
   await page.waitForTimeout(180); // sample near apex
   const yApex = await py();
+  const airAnim = await anim(); // a tap cuts the rise, so apex may already read "fall"
   check("player jumps", yGround - yApex > 30, `dy=${(yGround - yApex).toFixed(1)}`);
+  check("air anim while jumping", airAnim === "jump" || airAnim === "fall", `anim=${airAnim}`);
 
   // --- §1 Insert Coin: falling off the world shows the DOM overlay (not Kaplay) ---
   await page.evaluate(() => (window.__pj.k.get("player")[0].pos.y = 999999));
@@ -148,6 +155,22 @@ try {
     () => document.getElementById("receipt-amount").textContent,
   );
   check("finale receipt shows debt", amount === "500", `amount=${amount}`);
+
+  // --- §3 Animation contract: the finale avatar wears all four skins, celebrates, and
+  // every skin layer mirrors the body's sheet frame (src/animspec.js sync contract). ---
+  const avatarState = await page.evaluate(() => {
+    const av = window.__pj.k.get("avatar")[0];
+    return av
+      ? { anim: av.curAnim(), frame: av.frame, layerFrames: av.skinLayers.map((l) => l.frame) }
+      : null;
+  });
+  check("finale avatar celebrates", avatarState?.anim === "celebrate", `anim=${avatarState?.anim}`);
+  check(
+    "skin layers frame-synced",
+    avatarState && avatarState.layerFrames.length === 4 &&
+      avatarState.layerFrames.every((f) => f === avatarState.frame),
+    JSON.stringify(avatarState),
+  );
   await page.screenshot({ path: SHOT });
 
   // --- Report ---

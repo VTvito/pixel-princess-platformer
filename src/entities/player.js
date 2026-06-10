@@ -49,9 +49,20 @@ export function makePlayer(char, pos, skinKeys = []) {
   ]);
 
   // Skin layering: child sprites at the same centre (shared with the finale avatar).
-  // flipX is not inherited, so the onUpdate below syncs it each frame.
+  // flipX and frame are not inherited, so the onUpdate below syncs them each frame.
   player.skinKeys = skinKeys;
   player.skinLayers = addSkinLayers(player, skinKeys);
+
+  // Animation state machine. The state is derived from physics each update (run / idle /
+  // jump / fall); scene code can take over for scripted moments (hurt / celebrate) via
+  // setAnim, which locks the auto states until the scene rebuilds the player.
+  player.animLock = false;
+  player.setAnim = (name) => {
+    player.animLock = true;
+    player.play(name);
+    syncSkins(player);
+  };
+  player.play("idle");
 
   // Squash & stretch (spec §3). A squash factor eases back to neutral each frame and gets
   // "kicked" on jump (tall + thin) and on landing (wide + short); the rendered scale is
@@ -90,10 +101,8 @@ export function makePlayer(char, pos, skinKeys = []) {
     player.vx = target; // instant
     player.move(player.vx, 0); // framerate-independent (px/s)
 
-    // Face travel direction (sprites authored facing right). Skin layers must flip too —
-    // flipX is not inherited from the parent transform.
+    // Face travel direction (sprites authored facing right).
     player.flipX = player.facing === -1;
-    player.skinLayers.forEach((layer) => (layer.flipX = player.flipX));
 
     // Jump with coyote time + input buffering. Remember the most recent press, and allow a
     // jump if we're grounded (or within the coyote window of having been).
@@ -133,7 +142,25 @@ export function makePlayer(char, pos, skinKeys = []) {
     player.squashX += (1 - player.squashX) * ease;
     player.squashY += (1 - player.squashY) * ease;
     player.scale = k.vec2(BASE * player.squashX, BASE * player.squashY);
+
+    // Animation state from physics (unless a scripted anim took over), then mirror
+    // flipX + frame to the skin layers — they are never animated independently.
+    if (!player.animLock) {
+      const next = !groundedNow ? (player.vel.y < 0 ? "jump" : "fall") : player.vx !== 0 ? "run" : "idle";
+      if (player.curAnim() !== next) player.play(next);
+    }
+    syncSkins(player);
   });
 
   return player;
+}
+
+// Mirror the parent's facing + sheet frame onto every skin layer (the layers share the
+// parent's sheet layout — see src/animspec.js — so equal frame index = equal pose).
+// Exported for the finale avatar, which layers skins the same way.
+export function syncSkins(parent) {
+  for (const layer of parent.skinLayers) {
+    layer.flipX = parent.flipX;
+    layer.frame = parent.frame;
+  }
 }

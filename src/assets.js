@@ -3,10 +3,16 @@
 
 import { k } from "./kaplayCtx.js";
 import { ASSETS } from "./config.js";
+import { SHEET, ANIMS, ANIMATED_SPRITES } from "./animspec.js";
 
 export function loadAssets() {
   for (const [key, path] of Object.entries(ASSETS.sprites)) {
-    k.loadSprite(key, path);
+    if (ANIMATED_SPRITES.includes(key)) {
+      // Heroines + skins are 8×2 animation sheets sharing one contract (animspec.js).
+      k.loadSprite(key, path, { sliceX: SHEET.cols, sliceY: SHEET.rows, anims: ANIMS });
+    } else {
+      k.loadSprite(key, path);
+    }
   }
   // Tile atlas (spec §2): one image, many named frames usable as k.sprite("ground_top").
   if (ASSETS.tiles) {

@@ -111,6 +111,7 @@ export function registerGameScene() {
       if (finished || dead) return;
       dead = true;
       if (dbg) dbg.deaths += 1;
+      player.setAnim("hurt"); // the "ops" face — set before pausing freezes updates
       player.paused = true; // freeze the heroine behind the overlay
       sfx("oops"); // gentle "you slipped" cue (no harsh game-over — spec §1)
       resetInput();
@@ -245,6 +246,7 @@ export function registerGameScene() {
       if (finished || dead) return;
       finished = true;
       if (dbg) dbg.reachedGoal = true;
+      player.setAnim("celebrate"); // arms up while the reward card shows
       sfx("goal"); // triumphant arpeggio on clearing the level
       resetInput();
       const reward = skinUnlockedBy(level);

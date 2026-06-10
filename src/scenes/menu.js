@@ -180,13 +180,15 @@ export function registerMenuScene() {
         "card",
       ]);
 
-      // Character sprite (64×96), sized to sit in the upper half of the card.
-      card.add([
+      // Character sprite (64×96), sized to sit in the upper half of the card, breathing
+      // gently (the idle anim) so the chooser feels alive.
+      const heroSprite = card.add([
         k.sprite(char.sprite),
         k.anchor("center"),
         k.pos(0, -86),
         k.scale(1.7),
       ]);
+      heroSprite.play("idle");
 
       card.add([
         k.text(char.name, { size: 34 }),
