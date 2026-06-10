@@ -19,6 +19,7 @@ import {
   buildCrabStrip, buildFlyerStrip, buildPortalStrip,
   buildSpringStrip, buildFlagStrip, buildSwooperStrip, buildRollerStrip,
 } from "./world.mjs";
+import { DECOR } from "./decor.mjs";
 import { BG_THEMES, buildSky, buildMid, buildNear } from "./backgrounds.mjs";
 import { buildSfx, SONGS, encodeWav, normalize } from "./audio.mjs";
 
@@ -58,6 +59,9 @@ writeSprite("spring.png", buildSpringStrip());
 writeSprite("flag.png", buildFlagStrip());
 writeSprite("swooper.png", buildSwooperStrip());
 writeSprite("roller.png", buildRollerStrip());
+
+// Decor props — collider-free scenery, three per theme (placed by src/levels/build.js).
+for (const [file, paint] of DECOR) writeSprite(file, paint());
 
 // Tile atlas — one strip, frame offsets defined by TILE_FRAMES order (see config.js).
 writeFileSync(join(TILES_DIR, "tileset.png"), encodeScaled(buildTileAtlas()));

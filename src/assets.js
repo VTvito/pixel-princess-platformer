@@ -8,7 +8,7 @@ import { SHEET, ANIMS, ANIMATED_SPRITES, WORLD_SHEETS } from "./animspec.js";
 export function loadAssets() {
   for (const [key, path] of Object.entries(ASSETS.sprites)) {
     if (ANIMATED_SPRITES.includes(key)) {
-      // Heroines + skins are 8×2 animation sheets sharing one contract (animspec.js).
+      // Heroines + skins are 8×3 animation sheets sharing one contract (animspec.js).
       k.loadSprite(key, path, { sliceX: SHEET.cols, sliceY: SHEET.rows, anims: ANIMS });
     } else if (WORLD_SHEETS[key]) {
       // Collectibles / enemies / the portal: small horizontal strips with one loop each.

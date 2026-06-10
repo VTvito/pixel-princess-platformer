@@ -106,16 +106,24 @@ export function registerGameScene() {
     player.use(k.z(10));
 
     // --- Camera: leads the heroine in her facing direction (Mario-style lookahead) and
-    // eases toward the target, clamped to the level bounds ---
+    // eases toward the target, clamped to the level bounds. Vertical follow only engages
+    // on maps taller than the viewport (height-11 maps render exactly as before); it
+    // tracks a point slightly above the heroine so she sits below the screen centre.
     const halfW = GAME_W / 2;
+    const halfH = GAME_H / 2;
     const maxCamX = Math.max(halfW, worldW - halfW);
+    const maxCamY = Math.max(halfH, worldH - halfH);
+    const followY = worldH > GAME_H;
+    const camTargetY = () => Math.min(Math.max(player.pos.y - 40, halfH), maxCamY);
     let camX = Math.min(Math.max(player.pos.x, halfW), maxCamX); // start centred on spawn
+    let camY = followY ? camTargetY() : halfH;
     k.onUpdate(() => {
       const targetX = Math.min(Math.max(player.pos.x + player.facing * CAMERA.LOOKAHEAD, halfW), maxCamX);
       camX += (targetX - camX) * (1 - Math.exp(-k.dt() * CAMERA.EASE));
+      if (followY) camY += (camTargetY() - camY) * (1 - Math.exp(-k.dt() * CAMERA.EASE));
       // Round to whole pixels: with crisp/nearest-neighbour sampling, a fractional camera
       // makes tiles/sprites shimmer ("scattoso") as they cross sample boundaries.
-      setCam(k.vec2(Math.round(camX), GAME_H / 2));
+      setCam(k.vec2(Math.round(camX), Math.round(camY)));
     });
 
     // --- Failure flow (spec §1: no silent respawn — every failure accrues a debt) ---

@@ -87,6 +87,7 @@ export function makePlayer(char, pos, skinKeys = [], feel = {}) {
   let sinceJumpPressed = Infinity;
   let jumpCut = true;
   let runDustT = 0; // trickle timer for the faint dust behind a full-speed run
+  let landT = 0; // brief window after touchdown during which the "land" crouch shows
 
   player.onUpdate(() => {
     const input = getInput();
@@ -103,7 +104,10 @@ export function makePlayer(char, pos, skinKeys = [], feel = {}) {
     }
     const groundedNow = player.isGrounded();
     // Skid: reversing direction at speed on the ground kicks a dust puff against the run.
-    if (groundedNow && target !== 0 && Math.sign(target) !== Math.sign(player.vx) && Math.abs(player.vx) > PHYSICS.SKID_MIN) {
+    // The same condition drives the braced "skid" frame for as long as vx is reversing.
+    const skidding =
+      groundedNow && target !== 0 && Math.sign(target) !== Math.sign(player.vx) && Math.abs(player.vx) > PHYSICS.SKID_MIN;
+    if (skidding) {
       dustPuff(k.vec2(player.pos.x, player.pos.y + 44), { count: 4, dir: Math.sign(player.vx) });
       sfx("skid");
     }
@@ -158,8 +162,10 @@ export function makePlayer(char, pos, skinKeys = [], feel = {}) {
       player.squashX = 1.1; // squash wide on land
       player.squashY = 0.82;
       dustPuff(k.vec2(player.pos.x, player.pos.y + 44));
+      landT = 0.12; // show the touchdown crouch frame for a beat
     }
     wasGrounded = grounded;
+    landT -= dt;
 
     // Ease the squash back to neutral (framerate-independent) and apply it.
     const ease = 1 - Math.exp(-k.dt() * 15);
@@ -170,7 +176,11 @@ export function makePlayer(char, pos, skinKeys = [], feel = {}) {
     // Animation state from physics (unless a scripted anim took over), then mirror
     // flipX + frame to the skin layers — they are never animated independently.
     if (!player.animLock) {
-      const next = !groundedNow ? (player.vel.y < 0 ? "jump" : "fall") : player.vx !== 0 ? "run" : "idle";
+      const next = !groundedNow
+        ? (player.vel.y < 0 ? "jump" : "fall")
+        : skidding ? "skid"
+        : landT > 0 ? "land"
+        : player.vx !== 0 ? "run" : "idle";
       if (player.curAnim() !== next) player.play(next);
     }
     syncSkins(player);

@@ -6,7 +6,7 @@
 
 import { k } from "../kaplayCtx.js";
 import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE } from "../config.js";
-import { getSelectedCharacter, getCoccoline } from "../state.js";
+import { getSelectedCharacter, getCoccoline, getCoccolineRun } from "../state.js";
 import { addSkinLayers, syncSkins } from "../entities/player.js";
 import { resetInput } from "../controls.js";
 import { showReceipt, hideReceipt } from "../ui/receipt.js";
@@ -123,8 +123,8 @@ export function registerFinaleScene() {
     k.onKeyPress(["enter", "space", "escape"], toMenu);
 
     // The payoff (spec §2): after a beat to let the cutscene land, show the receipt with
-    // the total Coccoline debt + the WhatsApp "Paga il Debito!" button.
-    k.wait(1.4, () => showReceipt(getCoccoline()));
+    // this run's Coccoline bill (+ the lifetime total) and the WhatsApp "Paga il Debito!".
+    k.wait(1.4, () => showReceipt(getCoccolineRun(), getCoccoline()));
   });
 }
 

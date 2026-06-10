@@ -32,6 +32,7 @@ export function buildLevel(def) {
 
   let spawn = null;
   let collectiblesTotal = 0;
+  const decorSpots = []; // exposed, item-free ground tops — candidates for decor props
 
   rows.forEach((row, r) => {
     for (let c = 0; c < row.length; c++) {
@@ -67,6 +68,9 @@ export function buildLevel(def) {
           // blades, tinted theme.solidTop (keeps the faithful two-tone surface look).
           if (airAbove) {
             k.add([k.sprite(c % 2 ? "grass_cap_2" : "grass_cap"), k.pos(x, y), k.color(...theme.solidTop), k.z(1)]);
+            // Ground tops (not floating slabs) with truly empty air above can host a
+            // decor prop — anything in the cell above (item/hazard/spawn/goal) vetoes it.
+            if (!airBelow && (rows[r - 1]?.[c] ?? " ") === " ") decorSpots.push({ c, r });
           }
           break;
         }
@@ -126,8 +130,64 @@ export function buildLevel(def) {
   // Moving platforms (data-driven, not ASCII — see the legend note at the top).
   for (const m of def.movers || []) makeMover(m, TILE, theme);
 
+  // Decor props: collider-free scenery. Procedural dressing on the ground tops collected
+  // above, plus authored hero placements (def.decor, data-driven like movers) — a tree
+  // framing the goal, lanterns flanking a checkpoint. Neither touches gameplay or the bot.
+  placeDecorProps(theme, decorSpots, TILE);
+  for (const d of def.decor || []) {
+    makeDecorProp(d.key, (d.x + 0.5) * TILE, (d.y + 1) * TILE, !!d.fg);
+  }
+
   if (!spawn) spawn = k.vec2(TILE * 1.5, 0); // defensive fallback if a level omits "@"
   return { spawn, worldW, worldH, collectiblesTotal };
+}
+
+// --- Decor props: pure scenery (no area/body), sprite keys from theme.props ------------
+// Rooted plants sway gently; everything else stands still. z 0 keeps props behind the
+// grass caps (z 1) and the heroine (z 10); rare small accents go to z 12 (foreground,
+// in front of her but low and small enough never to hide her).
+const SWAY_PROPS = new Set(["deco_kelp", "deco_fern"]);
+
+function makeDecorProp(key, cx, baseY, fg) {
+  const prop = k.add([
+    k.sprite(key),
+    k.pos(Math.round(cx), Math.round(baseY)),
+    k.anchor("bot"),
+    k.z(fg ? 12 : 0),
+    ...(SWAY_PROPS.has(key) ? [k.rotate(0)] : []),
+    "decor",
+  ]);
+  if (SWAY_PROPS.has(key)) {
+    const phase = (cx * 0.013) % (Math.PI * 2); // desync neighbours
+    prop.onUpdate(() => {
+      prop.angle = Math.sin(k.time() * 1.1 + phase) * 3;
+    });
+  }
+  return prop;
+}
+
+// Procedural dressing: ~1 candidate cell in 6 gets a prop, chosen from the theme's
+// weighted menu. Deterministic position hashes (same style as the tile variants) so the
+// scenery is stable across reloads — no rand(), no churn in screenshots.
+function placeDecorProps(theme, spots, TILE) {
+  const menu = theme.props || [];
+  if (!menu.length) return;
+  const totalWeight = menu.reduce((s, p) => s + (p.weight || 1), 0);
+  for (const { c, r } of spots) {
+    if ((c * 13 + r * 7) % 6 !== 0) continue;
+    let pick = (c * 31 + r * 17) % totalWeight;
+    let entry = menu[menu.length - 1];
+    for (const p of menu) {
+      pick -= p.weight || 1;
+      if (pick < 0) {
+        entry = p;
+        break;
+      }
+    }
+    // Foreground accents: only fg-capable props (small ones), roughly 1 placement in 4.
+    const fg = !!entry.fg && (c * 11 + r * 5) % 4 === 0;
+    makeDecorProp(entry.key, c * TILE + TILE / 2, r * TILE, fg);
+  }
 }
 
 // --- Semisolid platform: pass through from below/sides, stand on top (one-way).

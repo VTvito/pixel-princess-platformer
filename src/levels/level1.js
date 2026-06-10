@@ -9,9 +9,16 @@
 //   • twist (x51–63): a spring launches the heroine onto a one-way high route that
 //     carries her over a double ravine (the critical path itself goes airborne);
 //   • climax (x86–119): a terraced climb (1 then 2 cells) to a goal with a view.
-// Checkpoints at x49 and x88 keep retries kind — deaths still cost 500 Coccoline.
+//   • secret (x68–81): a spring lifts her onto a CANOPY semisolid above the lane — a
+//     trail of apples and a second star pay out the detour (off the bot's critical path).
+// Checkpoints at x49, x68 and x88 keep retries kind — deaths still cost 500 Coccoline.
 
-import { composeMap, arcCollectibles, LANE } from "./mapkit.js";
+import { composeMap, arcCollectibles, laneFor, airFor } from "./mapkit.js";
+
+// Taller map (vertical camera follow): 14 rows instead of 11 — extra sky for high routes.
+const H = 14;
+const LANE = laneFor(H);
+const AIR = airFor(H);
 
 export const LEVEL_1 = {
   id: 1,
@@ -38,10 +45,24 @@ export const LEVEL_1 = {
     collectibleAccent: [255, 240, 200], // apple highlight
     collectibleGlow: [255, 236, 170], // warm aura behind the apple (juiciness)
     leaf: [126, 178, 96], // apple leaf (forest only)
+    // Decor props menu (collider-free scenery; weights drive the procedural mix — build.js).
+    props: [
+      { key: "deco_tree", weight: 2 },
+      { key: "deco_fern", weight: 3, fg: true },
+      { key: "deco_mushroom", weight: 3, fg: true },
+    ],
   },
+
+  // Authored decor: trees framing the journey's start and the summit goal.
+  decor: [
+    { x: 5, y: LANE, key: "deco_tree" },
+    { x: 113, y: 9, key: "deco_tree" },
+    { x: 119, y: 9, key: "deco_tree" },
+  ],
 
   map: composeMap({
     width: 120,
+    height: H,
     ravines: [
       { x: 22, w: 2 }, // intro: one clean, jumpable gap
       { x: 46, w: 2 }, // develop: bridged at the lane (landing practice)
@@ -55,42 +76,52 @@ export const LEVEL_1 = {
     ],
     platforms: [
       { x: 46, y: LANE, w: 2 }, // stepping-bridge over the develop ravine
-      { x: 27, y: 4, w: 3 }, // bonus perch above the first spring
+      { x: 27, y: 7, w: 3 }, // bonus perch above the first spring
     ],
-    // One-way high route: launched onto by the spring at x52, carries over both twist
-    // ravines, drops back to the lane safely past them (landing ≈ x64, solid ground).
-    semisolids: [{ x: 52, y: 4, w: 10 }],
+    // One-way high routes: the twist route (launched onto by the spring at x52, carries
+    // her over both ravines), then the secret CANOPY (spring at x72) with its apple trail.
+    semisolids: [
+      { x: 52, y: 7, w: 10 },
+      { x: 70, y: 7, w: 12 }, // the canopy — drops back to the lane at x82
+    ],
     items: [
       { x: 2, y: LANE, ch: "@" }, // spawn
-      { x: 117, y: 6, ch: ">" }, // goal on the summit terrace (walk row 6)
-      // Springs: the bonus one (perch above), then the critical-path launcher.
+      { x: 117, y: 9, ch: ">" }, // goal on the summit terrace (walk row 9)
+      // Springs: the bonus one (perch above), the critical-path launcher, the canopy lift.
       { x: 29, y: LANE, ch: "M" },
       { x: 52, y: LANE, ch: "M" },
-      // Checkpoints: before the twist, before the climb.
+      { x: 72, y: LANE, ch: "M" },
+      // Checkpoints: before the twist, before the canopy, before the climb.
       { x: 49, y: LANE, ch: "F" },
+      { x: 68, y: LANE, ch: "F" },
       { x: 88, y: LANE, ch: "F" },
-      // Thorns: one per stretch, clear of ravine edges and spring landings.
+      // Thorns: one per stretch, clear of ravine edges, spring landings and the canopy drop.
       { x: 12, y: LANE, ch: "^" },
       { x: 36, y: LANE, ch: "^" },
       { x: 76, y: LANE, ch: "^" },
-      { x: 82, y: LANE, ch: "^" },
-      { x: 98, y: 7, ch: "^" }, // on the first terrace's surface
+      { x: 98, y: 10, ch: "^" }, // on the first terrace's surface
       // Star power-up on the lane: a taste of invincibility before the twist.
       { x: 40, y: LANE, ch: "*" },
-      // Apples along the run (rows 6–7, grabbed mid-jump).
-      ...arcCollectibles([8, 16, 23, 32, 44, 68, 72, 80, 86]),
+      // Apples along the run (rows 9–10, grabbed mid-jump).
+      ...arcCollectibles([8, 16, 23, 32, 44, 64, 86], [AIR, LANE - 1]),
       // Bonus apples: the spring perch, the high route, and the climb.
-      { x: 27, y: 3, ch: "o" },
-      { x: 28, y: 3, ch: "o" },
-      { x: 29, y: 3, ch: "o" },
-      { x: 55, y: 3, ch: "o" },
-      { x: 57, y: 3, ch: "o" },
-      { x: 59, y: 3, ch: "o" },
-      { x: 97, y: 6, ch: "o" },
-      { x: 100, y: 6, ch: "o" },
-      { x: 106, y: 5, ch: "o" },
-      { x: 110, y: 5, ch: "o" },
-      { x: 114, y: 5, ch: "o" },
+      { x: 27, y: 6, ch: "o" },
+      { x: 28, y: 6, ch: "o" },
+      { x: 29, y: 6, ch: "o" },
+      { x: 55, y: 6, ch: "o" },
+      { x: 57, y: 6, ch: "o" },
+      { x: 59, y: 6, ch: "o" },
+      { x: 97, y: 9, ch: "o" },
+      { x: 100, y: 9, ch: "o" },
+      { x: 106, y: 8, ch: "o" },
+      { x: 110, y: 8, ch: "o" },
+      { x: 114, y: 8, ch: "o" },
+      // The canopy's payout: an apple trail and a second star up in the leaves.
+      { x: 71, y: 6, ch: "o" },
+      { x: 74, y: 6, ch: "o" },
+      { x: 77, y: 6, ch: "o" },
+      { x: 80, y: 6, ch: "o" },
+      { x: 75, y: 5, ch: "*" },
     ],
   }),
 };

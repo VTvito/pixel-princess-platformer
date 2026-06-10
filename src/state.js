@@ -95,24 +95,45 @@ export function resetProgress() {
 }
 
 // --- "Insert Coin" meta-game (Specifiche_Polishing §1) ------------------------
-// The running tab of "debiti": every failure costs 500 Coccoline. Stored under the exact
-// key the spec names ("totaleCoccoline"), initialised to 0 on first read, and read back
-// for the finale receipt (§2). The debt is deliberately cumulative across the whole gift
-// (a bigger number is the joke), so it is NOT cleared by resetProgress / "Nuova partita".
+// The running tab of "debiti": every failure costs 500 Coccoline, tracked on TWO counters:
+//   - "totaleCoccoline" (exact key from the spec): the lifetime grand total, never reset —
+//     the historical line on the finale receipt (a bigger number is part of the joke).
+//   - "pj.coccolineRun": this adventure's bill. Reset ONLY when the player explicitly
+//     starts a "Nuova partita" (not on "Riprendi", not on a death respawn), so the finale
+//     receipt (§2) charges for the current journey alone.
 const COCCOLINE_KEY = "totaleCoccoline";
+const COCCOLINE_RUN_KEY = "pj.coccolineRun";
 
-export function getCoccoline() {
-  const n = parseInt(read(COCCOLINE_KEY) || "0", 10);
+function readCount(key) {
+  const n = parseInt(read(key) || "0", 10);
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export function addCoccoline(amount) {
-  const total = getCoccoline() + amount;
-  write(COCCOLINE_KEY, String(total));
-  return total;
+export function getCoccoline() {
+  return readCount(COCCOLINE_KEY);
 }
 
-// Reset the debt (testing / dev only — not wired to any in-game button).
+export function getCoccolineRun() {
+  return readCount(COCCOLINE_RUN_KEY);
+}
+
+export function addCoccoline(amount) {
+  write(COCCOLINE_KEY, String(getCoccoline() + amount));
+  const run = getCoccolineRun() + amount;
+  write(COCCOLINE_RUN_KEY, String(run));
+  return run;
+}
+
+// Start a fresh bill for a new journey ("Nuova partita"). The lifetime total survives.
+export function resetCoccolineRun() {
+  try {
+    window.localStorage.removeItem(COCCOLINE_RUN_KEY);
+  } catch {
+    // no-op
+  }
+}
+
+// Reset the lifetime debt (testing / dev only — not wired to any in-game button).
 export function resetCoccoline() {
   try {
     window.localStorage.removeItem(COCCOLINE_KEY);

@@ -74,12 +74,16 @@ if (LEVELS.length === 0) {
 //
 // Bot tuning (ms). Generous — this checks "is there a path", not speedrunning.
 const POLL = 70; // sample/drive cadence
-const LEVEL_BUDGET = 75000; // wall-clock per level before giving up; checkpoints make retries
-//                             cheap, so 75s leaves ample headroom over a ~25s clean run
+const LEVEL_BUDGET = 110000; // wall-clock per level before giving up; checkpoints make retries
+//                              cheap, so 110s leaves ample headroom over a ~25-45s clean run
+//                              (the enriched height-14 maps play longer by design)
 const STALL_FAIL = 4000; // wedged (not deliberately waiting) this long → blocked: report x
 const WAIT_FAIL = 9000; // waiting (hazard / inbound mover) this long → something is wrong
-const DEATH_TOLERANCE = 15; // respawns allowed before we call the path un-completable (NOT a
-//                             target to minimise — the impeded bot is expected to die some)
+const DEATH_TOLERANCE = 30; // total respawns allowed (NOT a target to minimise — the impeded
+//                             bot is expected to die some; enemy/hazard pairs are timing-luck)
+const LOOP_TOLERANCE = 8; // consecutive deaths with NO new forward progress → a genuine death
+//                           loop (bad checkpoint placement, unjumpable hazard) → fail fast
+const PROGRESS_EPS = 32; // px of new maxX that count as "progress" between deaths
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -262,6 +266,8 @@ async function playLevel(page, n) {
   let seenDeaths = 0;
   let goalX = null;
   let lastX2 = null;
+  let loopDeaths = 0; // consecutive deaths without new maxX progress
+  let progressMark = -Infinity; // maxX at the last death that DID show progress
 
   while (Date.now() - t0 < LEVEL_BUDGET) {
     const s = await tick(page);
@@ -271,9 +277,20 @@ async function playLevel(page, n) {
       return { ok: true, level: n, maxX, goalX, deaths: s.deaths, ms: Date.now() - t0 };
     }
 
-    // Death → bank the coin to respawn, then reset the watchdog.
+    // Death → bank the coin to respawn, then reset the watchdog. A run that keeps making
+    // forward progress may die plenty (timing-luck at enemy/hazard pairs); a run dying
+    // repeatedly at the SAME furthest point is a genuine death loop — fail that fast.
     if (s.coinShown || s.deaths > seenDeaths) {
       seenDeaths = s.deaths;
+      if (maxX > progressMark + PROGRESS_EPS) {
+        progressMark = maxX;
+        loopDeaths = 1;
+      } else {
+        loopDeaths += 1;
+      }
+      if (loopDeaths >= LOOP_TOLERANCE) {
+        return { ok: false, level: n, why: `death loop (${loopDeaths} deaths with no progress)`, maxX, goalX, deaths: seenDeaths, ms: Date.now() - t0 };
+      }
       if (seenDeaths >= DEATH_TOLERANCE) {
         return { ok: false, level: n, why: "too many deaths", maxX, goalX, deaths: seenDeaths, ms: Date.now() - t0 };
       }

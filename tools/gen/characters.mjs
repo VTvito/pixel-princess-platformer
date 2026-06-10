@@ -3,12 +3,12 @@
 //
 // ANIMATION BY SHARED POSE RECORDS: every drawing decision that animation moves (head
 // bob, leg stride, arm swing, hair sway/lift, skirt flare, blink, …) reads from a pose
-// record, and FRAME_POSES defines one record per sheet cell (16 cells, layout + anim
+// record, and FRAME_POSES defines one record per sheet cell (24 cells, layout + anim
 // ranges in src/animspec.js). The body painter AND every skin painter consume the same
 // record for the same frame index, so the runtime overlay layers (which mirror the
 // parent's frame each update) are in sync by construction — drift is impossible.
 
-import { newImg, pset, fillRect, fillTrap, blit, outline } from "./px.mjs";
+import { newImg, pset, fillRect, fillTrap, blit, outline, lighten } from "./px.mjs";
 import { SHEET } from "../../src/animspec.js";
 
 export const BODY_W = 16;
@@ -66,8 +66,15 @@ export const FRAME_POSES = [
   // 13-14 celebrate: arms up, little hop
   pose({ armsUp: true, skirtFlare: 1 }),
   pose({ armsUp: true, headBob: -1, skirtFlare: 1, hairSway: 1 }),
-  // 15 spare (blank cell)
-  null,
+  // 15 skid: braced legs, leaning back, hair + skirt thrown forward by the momentum
+  pose({ lean: -1, legLx: 2, legRx: 1, armSwing: -1, hairSway: -2, skirtFlare: 2 }),
+  // 16 land: a brief crouch — tucked legs, head dipped, skirt settling wide
+  pose({ tuck: 2, headBob: 2, armSwing: 1, hairLift: 1, skirtFlare: 2 }),
+  // 17-18 celebrate continued: the hop peaks, then a happy blink on the way down
+  pose({ armsUp: true, headBob: -2, skirtFlare: 2, hairSway: -1 }),
+  pose({ armsUp: true, headBob: 1, blink: true, skirtFlare: 1, hairSway: 1 }),
+  // 19-23 spare (blank cells)
+  null, null, null, null, null,
 ];
 
 /**
@@ -80,7 +87,10 @@ export function paintHeroine(look, p = POSE) {
   const hb = p.headBob;
   const lean = p.lean;
   const hairDark = look.hair.map((v) => Math.round(v * 0.74));
+  const hairLight = lighten(look.hair, 1.3);
   const topDark = look.top.map((v) => Math.round(v * 0.78));
+  const topLight = lighten(look.top, 1.22);
+  const legsDark = look.legs.map((v) => Math.round(v * 0.85));
 
   // Back hair: side locks falling from the head down to hairLen, swaying/lifting with the
   // pose (style cue per character).
@@ -101,6 +111,8 @@ export function paintHeroine(look, p = POSE) {
   } else {
     fillRect(img, 5 + lean, 14, 11 + lean, 16, topDark); // simple waist shading
   }
+  // Rim-light on the leading edge of the torso (sprites are authored facing right).
+  fillRect(img, 11 + lean, 10, 12 + lean, 14, topLight);
   // Arms: raised in celebration, otherwise sleeves at the torso sides swinging opposite.
   if (p.armsUp) {
     fillRect(img, 3 + lean, 6 + hb, 4 + lean, 11, look.top);
@@ -117,7 +129,8 @@ export function paintHeroine(look, p = POSE) {
 
   // Legs y16-20 (strided / lifted / tucked by the pose), shoes under them.
   const legTop = 16 + p.tuck;
-  fillRect(img, 5 + p.legLx, legTop, 7 + p.legLx, 21 - p.legLy, look.legs);
+  // The left leg is the far one (facing right): slightly darker so the stride reads.
+  fillRect(img, 5 + p.legLx, legTop, 7 + p.legLx, 21 - p.legLy, legsDark);
   fillRect(img, 9 + p.legRx, legTop, 11 + p.legRx, 21 - p.legRy, look.legs);
   fillRect(img, 4 + p.legLx, 21 - p.legLy, 7 + p.legLx, 23 - p.legLy, look.shoes);
   fillRect(img, 9 + p.legRx, 21 - p.legRy, 12 + p.legRx, 23 - p.legRy, look.shoes);
@@ -129,6 +142,9 @@ export function paintHeroine(look, p = POSE) {
   fillRect(img, 4, 3 + hb, 6, 9 + hb, look.hair); // left frame
   fillRect(img, 10, 3 + hb, 12, 9 + hb, look.hair); // right frame
   fillRect(img, 6, 4 + hb, 10, 5 + hb, look.hair); // fringe over the forehead
+  pset(img, 7, 2 + hb, hairLight); // sheen on the crown of the head
+  pset(img, 8, 2 + hb, hairLight);
+  pset(img, 10, 3 + hb, hairLight); // catch-light down the leading lock
 
   // Face: eyes (open / blink / hurt), blush, mouth.
   if (p.blink || p.hurt) {
@@ -192,7 +208,7 @@ export function paintSkin(kind, color, p = POSE) {
   return img;
 }
 
-// Compose a full 8×2 sheet (one cell per FRAME_POSES entry) from a painter(pose) fn.
+// Compose a full 8×3 sheet (one cell per FRAME_POSES entry) from a painter(pose) fn.
 export function buildSheet(paintFrame) {
   const sheet = newImg(BODY_W * SHEET.cols, BODY_H * SHEET.rows);
   FRAME_POSES.forEach((p, i) => {

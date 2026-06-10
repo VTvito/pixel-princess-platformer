@@ -10,6 +10,7 @@ import {
   getCurrentLevel,
   setCurrentLevel,
   resetScore,
+  resetCoccolineRun,
 } from "../state.js";
 import { getLevelDef } from "../levels/index.js";
 import { fadeToScene } from "../ui/transition.js";
@@ -153,9 +154,10 @@ export function registerMenuScene() {
     }
 
     // --- Character chooser layer ---
+    // Label at y=180 (spans ~162-198) clears the card top edge (240, ~232 when hover-scaled).
     chooserLayer.add([
       k.text("Scegli la tua eroina", { size: 36 }),
-      k.pos(GAME_W / 2, 210),
+      k.pos(GAME_W / 2, 180),
       k.anchor("center"),
       k.color(...PALETTE.deepBlue),
     ]);
@@ -165,7 +167,7 @@ export function registerMenuScene() {
     const gap = 60;
     const totalW = CHARACTERS.length * cardW + (CHARACTERS.length - 1) * gap;
     const startX = (GAME_W - totalW) / 2 + cardW / 2;
-    const cardY = GAME_H / 2 + 60;
+    const cardY = GAME_H / 2 + 80;
 
     CHARACTERS.forEach((char, i) => {
       const cx = startX + i * (cardW + gap);
@@ -227,6 +229,7 @@ export function registerMenuScene() {
         setSelectedCharacter(char.id);
         setCurrentLevel(1);   // "Nuova partita" always begins the journey from level 1
         resetScore();         // a fresh journey starts from zero points
+        resetCoccolineRun();  // ...and a fresh bill (the lifetime total keeps counting)
         playBgm("bgm-forest", 0.32); // level 1's track, started within this gesture
         sfx("select");
         fadeToScene(() => k.go("game"));

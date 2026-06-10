@@ -189,6 +189,21 @@ export const ASSETS = {
     flag: "assets/sprites/flag.png",
     swooper: "assets/sprites/swooper.png",
     roller: "assets/sprites/roller.png",
+    // Decor props — collider-free scenery, three per theme. Placed procedurally on
+    // exposed ground tops + via authored def.decor lists (src/levels/build.js); each
+    // level's theme.props names its menu.
+    deco_tree: "assets/sprites/deco_tree.png",
+    deco_mushroom: "assets/sprites/deco_mushroom.png",
+    deco_fern: "assets/sprites/deco_fern.png",
+    deco_coralfan: "assets/sprites/deco_coralfan.png",
+    deco_kelp: "assets/sprites/deco_kelp.png",
+    deco_shell: "assets/sprites/deco_shell.png",
+    deco_lanternpost: "assets/sprites/deco_lanternpost.png",
+    deco_banner: "assets/sprites/deco_banner.png",
+    deco_chimney: "assets/sprites/deco_chimney.png",
+    deco_pine: "assets/sprites/deco_pine.png",
+    deco_snowdrift: "assets/sprites/deco_snowdrift.png",
+    deco_crystal_big: "assets/sprites/deco_crystal_big.png",
   },
 
   // Tile atlas (spec §2) — one 64px strip tinted per theme at runtime. Frames map names to

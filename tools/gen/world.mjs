@@ -252,20 +252,20 @@ export function paintCrystal() {
   return img;
 }
 
-// --- enemies (natural colors + contour; 4-frame walk/fly strips) ------------------------
+// --- enemies (natural colors + contour; 6-frame walk/fly strips) ------------------------
 
 function paintCrab(phase = 0) {
   const img = newImg(16, 10);
   const body = [206, 70, 60];
   const claw = [232, 120, 104];
-  const clawBob = [0, -1, 0, 1][phase]; // claws wave as it scuttles
+  const clawBob = [0, -1, -1, 0, 1, 1][phase]; // claws wave as it scuttles
   fillDisc(img, 8, 5, 4.4, body); // shell
   fillRect(img, 4, 4, 12, 8, body);
   fillRect(img, 4, 7, 12, 8, darken(body, 0.78)); // shaded underside
   fillRect(img, 1, 3 + clawBob, 3, 5 + clawBob, claw); // claws
   fillRect(img, 13, 3 - clawBob, 15, 5 - clawBob, claw);
-  // Legs alternate in pairs for the scuttle.
-  const legs = phase % 2 === 0 ? [4, 6, 9, 11] : [5, 7, 10, 12];
+  // Legs cycle through three stances for a busier scuttle.
+  const legs = [[4, 6, 9, 11], [5, 7, 10, 12], [4, 7, 9, 12]][phase % 3];
   for (const lx of legs) pset(img, lx, 8, darken(body, 0.7));
   pset(img, 6, 2, [255, 255, 255]); // eyes
   pset(img, 10, 2, [255, 255, 255]);
@@ -279,7 +279,7 @@ function paintFlyer(phase = 0) {
   const img = newImg(12, 8);
   const body = [44, 40, 60];
   const wing = [26, 24, 40];
-  const flap = [-1, 0, 1, 0][phase]; // wings beat up → mid → down → mid
+  const flap = [-1, 0, 1, 1, 0, -1][phase]; // wings beat up → mid → down and back
   fillDisc(img, 6, 4, 2.4, body);
   fillRect(img, 0, 2 + flap, 4, 4 + flap, wing);
   fillRect(img, 8, 2 + flap, 12, 4 + flap, wing);
@@ -290,8 +290,8 @@ function paintFlyer(phase = 0) {
   return img;
 }
 
-export const buildCrabStrip = () => strip([0, 1, 2, 3].map(paintCrab), 16, 10);
-export const buildFlyerStrip = () => strip([0, 1, 2, 3].map(paintFlyer), 12, 8);
+export const buildCrabStrip = () => strip([0, 1, 2, 3, 4, 5].map(paintCrab), 16, 10);
+export const buildFlyerStrip = () => strip([0, 1, 2, 3, 4, 5].map(paintFlyer), 12, 8);
 
 // --- goal portal (24×40 native, neutral grey, tinted theme.goal; 4-frame shimmer) ---------
 
@@ -388,7 +388,7 @@ function paintSwooper(phase = 0) {
 
 export const buildSwooperStrip = () => strip([0, 1, 2, 3].map(paintSwooper), 12, 12);
 
-// --- roller: a chasing snowball (14×14, 4 rotation frames) ----------------------------------
+// --- roller: a chasing snowball (14×14, 6 rotation frames) ----------------------------------
 
 function paintRoller(phase = 0) {
   const img = newImg(14, 14);
@@ -398,7 +398,7 @@ function paintRoller(phase = 0) {
   fillDisc(img, 8.5, 8.5, 4, shade); // bottom-right shading
   fillDisc(img, 6, 6, 3.6, snow);
   // Rotating speckles show the spin (positions advance with the phase).
-  const a = (phase / 4) * Math.PI * 2;
+  const a = (phase / 6) * Math.PI * 2;
   for (const off of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) {
     pset(img, Math.round(7 + Math.cos(a + off) * 3.4), Math.round(7 + Math.sin(a + off) * 3.4), shade);
   }
@@ -407,4 +407,4 @@ function paintRoller(phase = 0) {
   return img;
 }
 
-export const buildRollerStrip = () => strip([0, 1, 2, 3].map(paintRoller), 14, 14);
+export const buildRollerStrip = () => strip([0, 1, 2, 3, 4, 5].map(paintRoller), 14, 14);
