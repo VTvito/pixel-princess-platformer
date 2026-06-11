@@ -1,6 +1,6 @@
 // finale.js — "Sala da Ballo", the closing cutscene (spec §5).
 // A non-playable, cinematic scene: no gravity, no input bound. The chosen heroine stands
-// centre-stage as the "Principessa Perfetta" wearing all four unlocked skins, with a
+// centre-stage as the "Principessa Perfetta" wearing all six unlocked skins, with a
 // centred box showing a personalized message (edit FINALE in config.js). A single button
 // (or Enter/Esc) returns to the menu.
 
@@ -39,7 +39,7 @@ export function registerFinaleScene() {
     playBgm("finale-bgm", 0.34); // the grand waltz under the ballroom
     k.wait(0.2, () => sfx("win")); // warm fanfare as the ballroom settles in
 
-    // --- The heroine as "Principessa Perfetta": base body + all four skins layered on ---
+    // --- The heroine as "Principessa Perfetta": base body + all six skins layered on ---
     const baseY = 286;
     const avatar = k.add([
       k.sprite(char.sprite),
@@ -69,10 +69,10 @@ export function registerFinaleScene() {
       k.z(11),
     ]);
 
-    // --- Message box (the personalized note) ---
+    // --- Message box (the personalized note; sized for the six-chapter message) ---
     const boxW = 760;
-    const boxH = 210;
-    const boxY = GAME_H - 175;
+    const boxH = 250;
+    const boxY = GAME_H - 195;
     k.add([
       k.rect(boxW, boxH, { radius: 20 }),
       k.pos(GAME_W / 2, boxY),
@@ -90,8 +90,8 @@ export function registerFinaleScene() {
       k.z(21),
     ]);
     k.add([
-      k.text(FINALE.message, { size: 22, width: boxW - 80, align: "center", lineSpacing: 6 }),
-      k.pos(GAME_W / 2, boxY + 14),
+      k.text(FINALE.message, { size: 20, width: boxW - 80, align: "center", lineSpacing: 5 }),
+      k.pos(GAME_W / 2, boxY + 30),
       k.anchor("center"),
       k.color(...PALETTE.deepBlue),
       k.z(21),

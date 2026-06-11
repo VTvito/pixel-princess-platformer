@@ -166,17 +166,38 @@ export function registerGameScene() {
       if (finished || dead) return;
       const stomping = player.vel.y > 60 && player.pos.y < enemy.pos.y;
       if (isInvincible() || stomping) {
+        // Multi-hp enemies (the Gargoyle Custode): a stomp wounds and ENRAGES it — it
+        // flashes, bounces her off, and dives faster from now on. The star plows
+        // through hp outright (invincibility is earned).
+        if (stomping && !isInvincible() && enemy.hp && --enemy.hp > 0) {
+          player.vel.y = -PHYSICS.STOMP_BOUNCE;
+          hitStop();
+          screenShake(4);
+          dustPuff(enemy.pos);
+          sfx("stomp");
+          enemy.swoopTime *= 0.72; // enrage: quicker dives…
+          enemy.swoopCooldown *= 0.72; // …and shorter rests
+          if (enemy.art) {
+            enemy.art.color = k.rgb(255, 120, 120); // wound flash
+            k.wait(0.18, () => {
+              if (enemy.exists() && enemy.art) enemy.art.color = k.rgb(150, 150, 170);
+            });
+          }
+          bumpScore(SCORE.STOMP);
+          return;
+        }
         confettiBurst(enemy.pos, [theme.collectible, PALETTE.cream, PALETTE.gold]);
         sfx("stomp"); // satisfying squash thud
+        const wasBoss = !!enemy.hp;
         k.destroy(enemy);
         if (stomping) {
           player.vel.y = -PHYSICS.STOMP_BOUNCE; // bounce back up off a stomp
           // Impact weight: a tiny freeze + shake + dust make the stomp land (spec §3).
           hitStop();
-          screenShake(3);
+          screenShake(wasBoss ? 6 : 3);
           dustPuff(enemy.pos);
         }
-        bumpScore(SCORE.STOMP);
+        bumpScore(wasBoss ? SCORE.STOMP * 3 : SCORE.STOMP); // felling the guardian pays
       } else {
         die();
       }
@@ -314,15 +335,27 @@ export function registerGameScene() {
       if (dbg) dbg.reachedGoal = true;
       player.setAnim("celebrate"); // arms up while the reward card shows
       sfx("goal"); // triumphant arpeggio on clearing the level
+      // The last chapter's doors deserve fireworks: staggered confetti around her.
+      if (level >= MAX_LEVEL - 1) {
+        for (let i = 0; i < 5; i++) {
+          k.wait(i * 0.22, () => {
+            confettiBurst(
+              k.vec2(player.pos.x + (i - 2) * 70, player.pos.y - 40 - (i % 3) * 50),
+              [PALETTE.gold, PALETTE.cream, theme.collectible, PALETTE.rose],
+            );
+          });
+        }
+        screenShake(4);
+      }
       resetInput();
       const reward = skinUnlockedBy(level);
       setCurrentLevel(level + 1); // persist progress (drives the skin layering next level)
       showReward(reward, collected, collectiblesTotal, icon, level + 1);
     });
 
-    // --- Level-name banner that fades after a moment ---
+    // --- Chapter banner that fades after a moment ---
     const banner = k.add([
-      k.text(def.name, { size: 48 }),
+      k.text(`Capitolo ${level} — ${def.name}`, { size: 44 }),
       k.pos(GAME_W / 2, 110),
       k.anchor("center"),
       k.color(...hudColor),

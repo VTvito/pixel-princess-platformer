@@ -10,6 +10,7 @@
 //              "F" checkpoint flag   "g" swooper (diving ghost)   "r" roller (chasing ball)
 //              "w" updraft column cell   "B" breeze column cell (horizontal petal current)
 //              "P" pendulum chandelier (anchor cell; the lethal bob swings below)
+//              "G" Gargoyle Custode (mini-boss: a 2x stone swooper with 3 hp)
 //              "@" spawn   ">" goal   " " air (a gap in the ground rows is a ravine)
 // Moving platforms are not ASCII: a level may add `movers: [{x,y,w,dx,dy,period,phase}]`
 // (cells; dx/dy = travel amplitude in cells) — see makeMover.
@@ -89,6 +90,9 @@ export function buildLevel(def) {
           break;
         case "g":
           makeSwooper(x + TILE / 2, y + TILE / 2);
+          break;
+        case "G":
+          makeGargoyle(x + TILE / 2, y + TILE / 2);
           break;
         case "r":
           makeRoller(x + TILE / 2, y + TILE / 2);
@@ -352,6 +356,73 @@ function makeSwooper(cx, cy) {
     }
   });
   return swooper;
+}
+
+// --- Gargoyle Custode (Fase 5 mini-boss): a stone swooper at double size with 3 hp.
+// Same dive pattern as makeSwooper, but each stomp (handled by the game scene via the
+// hp field) makes it dive faster and rest less. Defeating it is satisfying but OPTIONAL:
+// the cooldown between dives is the sneak-past window — the same opening the autoplay
+// bot uses, so the critical path never requires the fight.
+function makeGargoyle(cx, cy) {
+  const gargoyle = k.add([
+    k.rect(64, 56, { radius: 16 }),
+    k.opacity(0),
+    k.pos(cx, cy),
+    k.anchor("center"),
+    k.area({ scale: 0.8 }),
+    k.z(4),
+    "enemy",
+    {
+      hp: 3,
+      baseY: cy,
+      diving: false,
+      t: 0,
+      // Starts already "resting": a bold straight sprint slips past before the first
+      // dive (the sneak window — hesitating or jumping for the goblets gets punished;
+      // it also keeps the guardian optional for the autoplay bot).
+      cooldown: MECHANICS.SWOOP_COOLDOWN * 1.25,
+      // Per-instance dive tunables — the scene shortens them on each stomp (enrage).
+      swoopTime: MECHANICS.SWOOP_TIME * 1.15,
+      swoopCooldown: MECHANICS.SWOOP_COOLDOWN * 1.25,
+    },
+  ]);
+  // The swooper sprite at 2x, tinted stone-grey: the lantern-ghost reads as a carved
+  // guardian. Exposed as .art so the scene can flash it on a successful stomp.
+  const art = gargoyle.add([
+    k.sprite("swooper"),
+    k.anchor("center"),
+    k.pos(0, 0),
+    k.scale(2),
+    k.color(150, 150, 170),
+  ]);
+  art.play("float");
+  gargoyle.art = art;
+  gargoyle.onUpdate(() => {
+    const dt = k.dt();
+    const p = k.get("player")[0];
+    if (!gargoyle.diving) {
+      gargoyle.pos.y = gargoyle.baseY + Math.sin(k.time() * 1.8) * 10; // heavy stone hover
+      const inRange = p && Math.abs(p.pos.x - gargoyle.pos.x) < MECHANICS.SWOOP_RANGE * 1.3;
+      // The stare-down: the dive timer only runs while she's in range, so EVERY approach
+      // gets the same window — sprint straight through and it never strikes; hesitate
+      // (or jump for the goblets) and the stone wakes.
+      if (inRange) gargoyle.cooldown -= dt;
+      if (inRange && gargoyle.cooldown <= 0) {
+        gargoyle.diving = true;
+        gargoyle.t = 0;
+      }
+    } else {
+      gargoyle.t += dt;
+      const f = Math.min(1, gargoyle.t / gargoyle.swoopTime);
+      gargoyle.pos.y = gargoyle.baseY + Math.sin(f * Math.PI) * (MECHANICS.SWOOP_DROP * 1.25);
+      if (p) gargoyle.pos.x += Math.sign(p.pos.x - gargoyle.pos.x) * 60 * dt; // lean toward her
+      if (f >= 1) {
+        gargoyle.diving = false;
+        gargoyle.cooldown = gargoyle.swoopCooldown;
+      }
+    }
+  });
+  return gargoyle;
 }
 
 // --- Roller: a snowball that wakes when the heroine is near and gives chase along the

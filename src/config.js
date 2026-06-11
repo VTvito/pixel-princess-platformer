@@ -100,7 +100,10 @@ export const FINALE = {
   message:
     "Hai attraversato foreste incantate, abissi di corallo,\n" +
     "tetti d'oriente e cime innevate...\n" +
-    "e a ogni passo sei diventata piu te stessa.\n\n" +
+    "hai danzato tra i petali del giardino al crepuscolo\n" +
+    "e superato il custode del castello.\n" +
+    "A ogni passo sei diventata piu te stessa.\n\n" +
+    "Le porte della sala da ballo sono aperte.\n" +
     "Buon viaggio, principessa.",
 };
 

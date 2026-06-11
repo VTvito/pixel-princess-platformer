@@ -6,8 +6,9 @@
 //
 // Arc: intro (the entrance hall, a bat overhead) → develop (the first chandelier, then
 // the cellar-pit crossing) → twist (the chandelier gauntlet + a crumbling minstrel
-// ledge) → climax (the grand staircase, its guardian ghost, and one last chandelier
-// before the doors).
+// ledge) → climax (the grand staircase, one last chandelier, and the GARGOYLE CUSTODE
+// — a 3-hp stone guardian over the ballroom doors; fell it with three stomps, or slip
+// past between its dives).
 
 import { composeMap, arcCollectibles, laneFor, airFor } from "./mapkit.js";
 
@@ -118,6 +119,10 @@ export const LEVEL_6 = {
       // enemy above a required step-up jump deadlocks the bot's hop — the L3 lesson.
       // Chandelier 3 guards the climb instead.)
       { x: 72, y: 8, ch: "g" },
+      // The Gargoyle Custode, hovering over the last stretch before the doors (the
+      // staircase top is flat — no required jump under it, so the bot can sneak past
+      // between dives).
+      { x: 122, y: 4, ch: "G" },
       // Star power-up before the gauntlet — blow through chandelier 2 invincible.
       { x: 74, y: LANE, ch: "*" },
       ...arcCollectibles([6, 15, 26, 38, 44, 54, 68, 76, 86, 94], [AIR, LANE - 1]),
