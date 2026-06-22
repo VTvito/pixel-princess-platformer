@@ -21,12 +21,30 @@ import { k } from "../kaplayCtx.js";
 import { PALETTE, ENEMIES, HAZARDS, MECHANICS, PHYSICS } from "../config.js";
 import { sfx } from "../sfx.js";
 
+// Cached heroine reference shared by the enemy-AI updates below. `k.get("player")` scans the
+// whole object tree (hundreds of tiles per level, no culling), and the diving/chasing enemies
+// would do it EVERY frame — pure waste on a mobile CPU. Memoize it instead.
+//
+// CACHE INVALIDATION — must reset on every scene (re)build: a death/restart goes through
+// `k.go("game")`, which ORPHANS the old scene's objects rather than `destroy()`-ing them, so
+// the previous heroine's `.exists()` can still report true. Trusting `.exists()` alone would
+// keep returning the stale, frozen heroine from the last life and the swoopers/gargoyles/
+// rollers would track a ghost. So `buildLevel()` nulls this at the top of every build (it runs
+// once per scene setup, before any enemy update fires); the `.exists()` re-query is a belt-and-
+// suspenders guard for a heroine destroyed WITHIN a single life.
+let cachedPlayer = null;
+function getPlayer() {
+  if (!cachedPlayer || !cachedPlayer.exists()) cachedPlayer = k.get("player")[0] ?? null;
+  return cachedPlayer;
+}
+
 /**
  * Render a level's tile map.
  * @param {{tileSize:number, map:string[], theme:object}} def
  * @returns {{spawn: any, worldW:number, worldH:number, collectiblesTotal:number}}
  */
 export function buildLevel(def) {
+  cachedPlayer = null; // drop any reference from a previous life/level (see note above)
   const TILE = def.tileSize;
   const rows = def.map;
   const theme = def.theme;
@@ -359,7 +377,7 @@ function makeSwooper(cx, cy, opts = {}) {
   swooper.art = art; // exposed so the game scene can flash it on a (non-fatal) stomp
   swooper.onUpdate(() => {
     const dt = k.dt();
-    const p = k.get("player")[0];
+    const p = getPlayer();
     if (!swooper.diving) {
       swooper.cooldown -= dt;
       swooper.pos.y = swooper.baseY + Math.sin(k.time() * 2.2) * 8; // idle hover
@@ -432,7 +450,7 @@ function makeGargoyle(cx, cy) {
   gargoyle.baseTint = k.rgb(150, 150, 170); // wound flash resets to the stone tint
   gargoyle.onUpdate(() => {
     const dt = k.dt();
-    const p = k.get("player")[0];
+    const p = getPlayer();
     if (!gargoyle.diving) {
       gargoyle.pos.y = gargoyle.baseY + Math.sin(k.time() * 1.8) * 10; // heavy stone hover
       const inRange = p && Math.abs(p.pos.x - gargoyle.pos.x) < MECHANICS.SWOOP_RANGE * 1.3;
@@ -477,7 +495,7 @@ function makeRoller(cx, cy) {
   const art = roller.add([k.sprite("roller"), k.anchor("center"), k.pos(0, 0)]);
   roller.onUpdate(() => {
     const dt = k.dt();
-    const p = k.get("player")[0];
+    const p = getPlayer();
     if (!roller.awake) {
       if (p && Math.abs(p.pos.x - roller.pos.x) < MECHANICS.ROLLER_RANGE) {
         roller.awake = true;

@@ -8,6 +8,7 @@ import { bindAudioToggle } from "./ui/audioToggle.js";
 import { installAudioUnlock } from "./audioUnlock.js";
 import { bindInstallHint } from "./ui/installHint.js";
 import { bindAudioDebug } from "./ui/audioDebug.js";
+import { bindFpsOverlay } from "./ui/fpsOverlay.js";
 import { registerLoadingScene } from "./scenes/loading.js";
 import { registerMenuScene } from "./scenes/menu.js";
 import { registerGameScene } from "./scenes/game.js";
@@ -32,6 +33,11 @@ bindInstallHint();
 // On-screen WebAudio diagnostics — only renders when the URL carries ?audiodebug=1. Lets a
 // real iPhone report its AudioContext state when iOS audio can't be reproduced in emulation.
 bindAudioDebug();
+
+// On-screen FPS / frame-time diagnostics — only renders when the URL carries ?fps=1. Lets a
+// real iPhone report the engine's actual cadence (fps + worst frame delta), since emulation
+// can't measure on-device fluidity. See src/ui/fpsOverlay.js.
+bindFpsOverlay();
 
 // Register every scene before navigating.
 registerLoadingScene();

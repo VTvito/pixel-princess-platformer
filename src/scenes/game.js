@@ -387,14 +387,33 @@ export function registerGameScene() {
       k.z(50),
     ]);
     featherLabel.hidden = true;
+    // Only rebuild the timer strings when the displayed integer second actually changes:
+    // the labels tick once per second, but the loop runs every frame — interpolating a new
+    // string 60×/s just to show the same number churns the GC (a source of micro-stutter).
+    let lastInvSec = -1;
+    let lastFeatherSec = -1;
     k.onUpdate(() => {
       const active = isInvincible();
       invLabel.hidden = !active;
-      if (active) invLabel.text = `★ INVINCIBILE  ${Math.ceil(invincibleUntil - k.time())}`;
+      if (active) {
+        const sec = Math.ceil(invincibleUntil - k.time());
+        if (sec !== lastInvSec) {
+          invLabel.text = `★ INVINCIBILE  ${sec}`;
+          lastInvSec = sec;
+        }
+      } else lastInvSec = -1;
       const feather = hasFeather();
       featherLabel.hidden = !feather;
-      if (feather) featherLabel.text = `PIUMA  ${Math.ceil(featherUntil - k.time())}`;
-      else if (player.jumpMul !== 1) player.jumpMul = 1; // high-jump lapsed → back to normal
+      if (feather) {
+        const sec = Math.ceil(featherUntil - k.time());
+        if (sec !== lastFeatherSec) {
+          featherLabel.text = `PIUMA  ${sec}`;
+          lastFeatherSec = sec;
+        }
+      } else {
+        lastFeatherSec = -1;
+        if (player.jumpMul !== 1) player.jumpMul = 1; // high-jump lapsed → back to normal
+      }
     });
 
     // --- Collectibles (golden apples / pearls) ---
