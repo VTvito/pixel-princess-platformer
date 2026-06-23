@@ -56,6 +56,15 @@ export const CHARACTERS = [
 // Total playable levels before the finale. Used for clamping currentLevel.
 export const MAX_LEVEL = 7;
 
+// Arcade lives (Fase Arcade). The journey is now a "partita": you start with START lives,
+// every level hands you one heart (+1 life, capped at MAX), and a death costs a life (plus the
+// 500-Coccoline bill — the gag is sacred). Run out of lives → Game Over → restart from level 1
+// with the score wiped, but the Coccoline tab keeps growing across attempts (see src/state.js).
+export const LIVES = {
+  START: 3, // lives at the start of a fresh run
+  MAX: 9,   // ceiling so a hoard of hearts can't trivialise the run
+};
+
 // Skin progression — clothing layers added on top of the base body as levels
 // are cleared. `afterLevel` is the level whose completion unlocks the layer; the keys are
 // sprite asset keys (see ASSETS.sprites). Order = paint order (skirt under … under crown).
@@ -86,6 +95,14 @@ export const ENEMIES = {
   FLY_RANGE: 150,
   FLY_BOB: 18,        // vertical bob amplitude (px)
   FLY_BOB_SPEED: 2.4, // bob cycles ~ rad/s
+  // Hopper (Rospo Saltatore): a ground enemy that hops in timed arcs, opening and closing a
+  // gap to pass under/over it. Stompable like every other "enemy". It carries its own gravity
+  // and gets an upward+forward impulse every HOP_INTERVAL seconds, ping-ponging within RANGE
+  // of its spawn. Units: px, px/s, s.
+  HOPPER_JUMP_VEL: 720,  // upward velocity per hop (arc height)
+  HOPPER_HOP_DX: 70,     // horizontal speed while airborne (px/s) — slow, readable arcs
+  HOPPER_INTERVAL: 1.4,  // seconds resting on the ground between hops
+  HOPPER_RANGE: 110,     // half-width of the patrol band around the spawn
 };
 
 // Hazard tunables. Stalactites (stalattiti, Livello 4) hang from the ceiling and drop on a

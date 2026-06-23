@@ -64,11 +64,31 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   path — a single jump can't clear wider; there is no double jump), thin out checkpoints.
 - **Service worker is prod-only:** `sw.js` is registered in `src/main.js` **only off localhost**,
   so it never caches stale files between Playwright runs / dev edits. On a real content change,
-  bump `CACHE` in `sw.js` so clients fetch fresh.
+  bump `CACHE` in `sw.js` so clients fetch fresh. It now also **bypasses `/api/*`** (never caches
+  the live leaderboard).
+- **Arcade lives = a "partita":** start `LIVES.START` (3) lives, +1 per `H` heart (one per level,
+  capped `LIVES.MAX`). A death spends a life **and** banks 500 Coccoline, respawning from the
+  checkpoint; at 0 lives `die()` calls `resetRun()` (level→1, score→0, lives refilled, checkpoint
+  cleared) and shows the **Game Over** overlay (`src/ui/gameOver.js`). `resetRun()` deliberately
+  **keeps** `coccolineRun` + `totaleCoccoline` so the finale tallies every Coccolina across
+  attempts — don't "fix" that; only "Nuova partita" wipes the bill (`resetCoccolineRun`). The
+  checkpoint is **persisted** (`pj.checkpoint`) so an interruption resumes mid-level; the pause
+  "Ricomincia il livello" sets `forceSpawn` to ignore it for that one entry.
+- **Leaderboard degrades offline:** the global classifica goes through `api/leaderboard.js`
+  (Vercel serverless → Upstash Redis). `src/leaderboard.js` swallows every error to `null`, so the
+  finale/menu still work with **no `/api`** — exactly the Playwright setup (`tools/serve.py` serves
+  statics only). Keep that graceful fallback or the test suite breaks.
+- **New enemies/pickups can be primitive-drawn:** the hopper (`h`) and heart (`H`) are drawn from
+  Kaplay primitives in `build.js` (like the star/feather), so they need **no `npm run gen`** and
+  no `ASSETS.sprites` entry. Reach for the asset pipeline only when you actually want pixel art.
 
 ## Secrets / deploy
 - `VERCEL_TOKEN` lives in a **gitignored + vercelignored `.env`**; `tools/deploy.mjs` reads it.
   Never commit `.env` or echo the token. After deploy, sanity-check `/.env` → 404 in prod.
+- The leaderboard store is **Upstash Redis via the Vercel Marketplace** (free on Hobby); linking
+  it injects `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (the function also accepts the
+  legacy `KV_REST_API_*` names). Unset → endpoint replies 503 → leaderboard hides (game still
+  ships). These are Vercel env vars, never committed.
 
 ## Conventions
 - Match the surrounding style: detailed top-of-file header comments explaining the "why",

@@ -51,8 +51,8 @@ export const LEVEL_5 = {
     ],
   },
 
-  // Authored decor: a fountain greeting the spawn, ivy arches framing two checkpoints,
-  // a rose bush by the gate.
+  // Authored decor: a fountain greeting the spawn, ivy arches framing the path (one by the
+  // x84 checkpoint), a rose bush by the gate.
   decor: [
     { x: 6, y: LANE, key: "deco_fountain" },
     { x: 34, y: LANE, key: "deco_ivyarch" },
@@ -91,12 +91,13 @@ export const LEVEL_5 = {
       // Breeze columns filling the two wide crossings (rows above the gaps).
       ...[40, 41, 42, 43].flatMap((x) => [8, 9, 10, 11].map((y) => ({ x, y, ch: "B" }))),
       ...[88, 89, 90, 91, 92].flatMap((x) => [7, 8, 9, 10, 11].map((y) => ({ x, y, ch: "B" }))),
-      // Checkpoints: clean run-up ahead of each (no hazard within ~4 cells, no springs).
-      // Thinned out (a death now costs more progress): the pre-climb x100 flag is gone, so
-      // the climax glide is banked only at x84.
-      { x: 34, y: LANE, ch: "F" },
+      // Arcade: thinned to two — before the moth-alley twist (x56) and before the climax
+      // glide (x84). The old early x34 flag is gone, so the intro + first breeze is banked
+      // only from spawn. Clean run-up ahead of each (no hazard within ~4 cells, no springs).
       { x: 56, y: LANE, ch: "F" },
       { x: 84, y: LANE, ch: "F" },
+      // A hopper on the flat intro hedge-walk, before the x18 gap.
+      { x: 8, y: LANE, ch: "h" },
       // Rose-thorn tangles: intro, terrace edges (room to accelerate), pre-climb.
       { x: 12, y: LANE, ch: "^" },
       { x: 29, y: 10, ch: "^" }, // far edge of the intro hedge
@@ -111,6 +112,8 @@ export const LEVEL_5 = {
       { x: 80, y: LANE, ch: "c" },
       { x: 114, y: 9, ch: "c" }, // on the upper terrace, guarding the gate
       // (No star before the moth alley anymore — the moth + armored-moth dives must be dodged.)
+      // Arcade: the level's heart (+1 vita), on the flat lane just before the x56 checkpoint.
+      { x: 54, y: LANE - 1, ch: "H" },
       ...arcCollectibles([6, 15, 22, 32, 46, 52, 64, 72, 78, 86, 95], [AIR, LANE - 1]),
       // Roses floating inside the breeze currents — grabbed mid-glide.
       { x: 41, y: 9, ch: "o" },

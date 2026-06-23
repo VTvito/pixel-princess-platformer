@@ -10,8 +10,9 @@
 //     carries her over a double ravine (the critical path itself goes airborne);
 //   • climax (x86–119): a terraced climb (1 then 2 cells) to a goal with a view.
 //   • secret (x68–81): a spring lifts her onto a CANOPY semisolid above the lane — a
-//     trail of apples and a second star pay out the detour (off the critical path).
-// Checkpoints at x49, x68 and x88 keep retries kind — deaths still cost 500 Coccoline.
+//     trail of apples pays out the detour (off the critical path).
+// Arcade: a single checkpoint at x49 banks the riskiest stretch (the airborne twist); a death
+// costs a life + 500 Coccoline, and the level hands out one heart (+1 vita) on the develop run.
 
 import { composeMap, arcCollectibles, laneFor, airFor } from "./mapkit.js";
 
@@ -93,11 +94,10 @@ export const LEVEL_1 = {
       { x: 29, y: LANE, ch: "M" },
       { x: 52, y: LANE, ch: "M" },
       { x: 72, y: LANE, ch: "M" },
-      // Checkpoints thinned to two (a death now costs more progress): before the twist and
-      // before the climb. The old mid x68 flag is gone — the canopy is a bonus route, so the
-      // x49→x88 stretch is banked only at its ends.
+      // Arcade: a SINGLE checkpoint, banked right before the airborne twist (the riskiest
+      // stretch). The terraced climax that follows has no ravines, so a slip there is
+      // survivable — it doesn't need its own flag anymore.
       { x: 49, y: LANE, ch: "F" },
-      { x: 88, y: LANE, ch: "F" },
       // Forest critters: a couple of ground crabs and a circling crow — the enchanted wood
       // isn't empty anymore. Placed on flat stretches, clear of jump arcs and the canopy drop.
       { x: 7, y: LANE, ch: "c" }, // greets her just past the spawn
@@ -109,8 +109,10 @@ export const LEVEL_1 = {
       { x: 42, y: LANE, ch: "^" }, // moved off the x29 spring's (now higher) bounce landing
       { x: 76, y: LANE, ch: "^" },
       { x: 98, y: 10, ch: "^" }, // on the first terrace's surface
-      // (No lane star before the twist anymore — the develop crabs/thorns now bite. The
-      // canopy's secret star at x75 stays as the optional reward for the high route.)
+      // (No invincibility stars in the tutorial anymore — arcade difficulty: the develop
+      // crabs/thorns and the airborne twist must be read and timed, not bulldozed.)
+      // Arcade: the level's heart (+1 vita), on the flat develop run so it's reliably grabbed.
+      { x: 40, y: LANE - 1, ch: "H" },
       // Apples along the run (rows 9–10, grabbed mid-jump).
       ...arcCollectibles([8, 16, 23, 32, 44, 64, 86], [AIR, LANE - 1]),
       // Bonus apples: the spring perch, the high route, and the climb.
@@ -125,12 +127,11 @@ export const LEVEL_1 = {
       { x: 106, y: 8, ch: "o" },
       { x: 110, y: 8, ch: "o" },
       { x: 114, y: 8, ch: "o" },
-      // The canopy's payout: an apple trail and a second star up in the leaves.
+      // The canopy's payout: an apple trail up in the leaves (the bonus high route).
       { x: 71, y: 6, ch: "o" },
       { x: 74, y: 6, ch: "o" },
       { x: 77, y: 6, ch: "o" },
       { x: 80, y: 6, ch: "o" },
-      { x: 75, y: 5, ch: "*" },
     ],
   }),
 };

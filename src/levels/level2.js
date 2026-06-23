@@ -91,12 +91,11 @@ export const LEVEL_2 = {
       // rows 8-12 is untouched, so the critical climax over the x88 gap is unaffected.
       ...[88, 89, 90].flatMap((x) => [4, 5, 6, 7].map((y) => ({ x, y, ch: "w" }))),
       { x: 26, y: LANE, ch: "M" }, // spring up to the bonus reef
-      // Checkpoints thinned to two (a death costs more progress now): after the first ride and
-      // before the shaft. The old mid x68 flag is gone, so the twist (second jellyfish + crab
-      // pressure, with the star removed) is banked only at x46. (Clean run-up ahead of each — a
-      // respawn right before a hazard or onto the spring's forced bounce turns a death into a loop.)
+      // Arcade: a SINGLE checkpoint after the first ride (x46), banking the intro so the
+      // riskiest stretch — the off-phase twist jellyfish at x72 — is retried from close by.
+      // The forgiving updraft climax beyond it doesn't need its own flag. (Clean run-up ahead —
+      // a respawn right before a hazard or onto the spring's forced bounce turns a death into a loop.)
       { x: 46, y: LANE, ch: "F" },
-      { x: 84, y: LANE, ch: "F" },
       // Urchins on the lane, clear of gap edges and crab patrols.
       { x: 14, y: LANE, ch: "^" },
       { x: 34, y: LANE, ch: "^" },
@@ -111,6 +110,8 @@ export const LEVEL_2 = {
       { x: 94, y: LANE, ch: "c" }, // a fresh guard on the post-updraft flat (banked at x84)
       { x: 100, y: LANE, ch: "c" },
       // (No mid-level star anymore — the twist's crab + urchin pressure now bites for real.)
+      // Arcade: the level's heart (+1 vita), on the flat reef between the urchins at x50/x60.
+      { x: 56, y: LANE - 1, ch: "H" },
       ...arcCollectibles([8, 16, 21, 32, 44, 50, 58, 66, 78, 86, 96, 102, 110], [AIR, LANE - 1]),
       // Crumble ledge: a quick risky hop over the twist stretch pays out two pearls.
       { x: 62, y: 9, ch: "!" },

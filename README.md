@@ -7,7 +7,9 @@ step, no CDN at runtime).
 The full journey is playable: a responsive landscape canvas, a main menu with character
 selection (Anna / Belle / Jasmine), **six** themed platformer levels with a
 clothing-skin progression, and the **Sala da Ballo** finale — all with `localStorage`
-progress.
+progress. It plays as an **arcade run**: you start with **3 lives** (+1 heart per level), a
+death costs a life (and 500 Coccoline), and losing them all restarts the journey from level 1.
+Finishing posts your score to a **global leaderboard**.
 
 ## Run it locally
 
@@ -34,7 +36,8 @@ files. The repo ships the config Vercel needs:
 - [`vercel.json`](vercel.json) — long-lived `Cache-Control` headers for `/assets/*` and
   `/vendor/*`.
 - [`.vercelignore`](.vercelignore) — keeps dev tooling (and **`.env`**) out of the deploy;
-  only `index.html`, `style.css`, the manifest, `src/`, `assets/` and `vendor/` are uploaded.
+  only `index.html`, `style.css`, the manifest, `src/`, `assets/`, `vendor/` and `api/` are
+  uploaded (`api/` runs as a serverless function — see **Leaderboard storage** below).
 
 **Live (production):** <https://gameforprincess.vercel.app>
 (team `lion-vi`, project `game_for_princess`).
@@ -57,6 +60,15 @@ VERCEL_TOKEN=...            # from https://vercel.com/account/tokens
 The `--scope lion-vi` is required (the token belongs to a team); `tools/deploy.mjs` applies it
 for you. The equivalent raw CLI fallback is
 `npx vercel deploy --prod --scope lion-vi --token "$VERCEL_TOKEN"`.
+
+### Leaderboard storage (optional)
+
+The global leaderboard ([`api/leaderboard.js`](api/leaderboard.js)) needs a Redis store. Add one
+from the **Vercel Marketplace** (Storage → Redis → **Upstash**, free on the Hobby plan) and link
+it to the project; it injects the connection env vars (`UPSTASH_REDIS_REST_URL` /
+`UPSTASH_REDIS_REST_TOKEN`, or the legacy `KV_REST_API_URL` / `KV_REST_API_TOKEN` — the function
+reads either). Without it the endpoint replies `503` and the in-game leaderboard simply hides, so
+this is optional: the game (and the rest of the deploy) works without it.
 
 ## Testing
 
@@ -169,14 +181,17 @@ src/
   kaplayCtx.js          creates & exports the single kaplay() context `k`
   config.js             virtual resolution, palette, CHARACTERS[], SKINS[], PHYSICS, MECHANICS, ASSETS
   assets.js             loads sprites/sounds from the ASSETS manifest
-  state.js              localStorage: selectedCharacter, currentLevel, score, Coccoline
+  state.js              localStorage: character, level, score, lives, checkpoint, nickname, Coccoline
+  leaderboard.js        client for the global leaderboard API (graceful offline fallback)
   controls.js           reusable input layer: keyboard + DOM touch buttons
   audio.js              Music + SFX buses: bgm playback + persisted toggles + resumeCurrentBgm()
   audioUnlock.js        resumes the AudioContext on the first real DOM gesture (iOS Safari)
   sfx.js                one-shot sound effects (k.play wrapper) on the SFX bus
   juice.js / animspec.js game-feel helpers (confetti) + the sprite animation contract
   ui/                   DOM/HTML overlays, isolated from the game's collision logic
-    insertCoin.js       "Insert Coin" death overlay
+    insertCoin.js       "Insert Coin" death overlay (shows lives remaining)
+    gameOver.js         Game Over overlay (out of lives → restart from level 1)
+    leaderboard.js      global-leaderboard overlay (nickname submit + Top 10)
     pauseMenu.js        pause overlay (Riprendi / Impostazioni / Ricomincia / Menu)
     settings.js         settings overlay: Musica/Effetti volume sliders + Cancella i progressi
     receipt.js          finale "Scontrino" + WhatsApp payoff
@@ -196,6 +211,8 @@ src/
     build.js            generic builder (solids/hazards/collectibles/enemies/mechanics/goal)
     mapkit.js           tile legend + map helpers shared by the level data
     index.js            level registry — getLevelDef(n), hasLevel(n)
+api/
+  leaderboard.js        Vercel serverless endpoint — global leaderboard (Upstash Redis via REST)
 tools/
   serve.py              dev server with correct ES-module MIME types
   deploy.mjs            `npm run deploy` — prod deploy reading VERCEL_TOKEN from .env
@@ -221,16 +238,19 @@ means adding sibling data files — no new rendering/collision code. The base le
 =  solid platform / ground      ^  hazard (rovi/ricci/ghiaccio → respawn)
 o  collectible (mela/perla/…)   c  crab enemy (patrols the ground → respawn)
 f  flyer enemy (patrols the air, bobs → respawn)
+h  hopper enemy (Rospo Saltatore: hops in timed arcs → respawn)
 s  stalactite (drops from the ceiling, then resets → respawn)
+H  heart — arcade life (+1 vita)
 @  player spawn                 >  level goal
 (space)  air — a gap in the ground rows is a ravine (burrone)
 ```
 
 Later phases add more mechanic tiles — springs, crumbling platforms, updrafts, swoopers (`g`),
 rollers, breeze columns, pendulum chandeliers, the **armored swooper** (`S`, a 2-hp diving
-guardian that enrages on a stomp) and the **feather** (`+`, a high-jump power-up on the bonus
-routes). See `src/levels/mapkit.js` + `build.js` for the full legend and `MECHANICS` / `POWERUP`
-in `src/config.js` for the tunables.
+guardian that enrages on a stomp), the **feather** (`+`, a high-jump power-up on the bonus
+routes), the **hopper** (`h`, a Rospo Saltatore that hops in timed arcs — from Livello 3 on) and
+the **heart** (`H`, +1 vita, one per level). See `src/levels/build.js` for the full legend and
+`MECHANICS` / `POWERUP` / `LIVES` / `ENEMIES` in `src/config.js` for the tunables.
 
 - **Livello 1 — Foresta Incantata**: a running lane, ravines, brambles, **forest critters**
   (patrolling crabs + a circling crow), golden apples.
@@ -242,18 +262,20 @@ in `src/config.js` for the tunables.
 - **Livello 6 — Castello Reale**: the royal castle, goblets 🏆, swinging **pendulum
   chandeliers** (lethal bobs with timed safe windows) and the **Gargoyle Custode**.
 
-Touching a hazard or enemy, or falling into a ravine, shows the Insert-Coin overlay and
-respawns you (from the last checkpoint, if any). On reaching the goal, a **reward screen**
-reveals the heroine in a golden spotlight wearing the freshly unlocked clothing layer, then
-continues to the next level. Clearing **Livello 6** leads to the finale (the non-playable
-level 7).
+Touching a hazard or enemy, or falling into a ravine, costs **a life and 500 Coccoline** and
+respawns you (from the last checkpoint, if any) via the Insert-Coin overlay. Run out of lives
+and it's **Game Over** — the run restarts from level 1 with the score wiped (the Coccoline tab
+keeps growing). On reaching the goal, a **reward screen** reveals the heroine in a golden
+spotlight wearing the freshly unlocked clothing layer, then continues to the next level.
+Clearing **Livello 6** leads to the finale (the non-playable level 7).
 
 ## Saving & resuming
 
-Progress (chosen heroine + current level) is saved to `localStorage` after every level
-(`src/state.js`). Reload and the menu shows a **Riprendi · Livello N** button that drops you
-straight back in — wearing the skins unlocked so far. **Nuova partita** starts fresh from
-level 1.
+Progress (chosen heroine, current level, **lives**, and the **last checkpoint**) is saved to
+`localStorage` (`src/state.js`). Reload and the menu shows a **Riprendi · Livello N** button
+that drops you straight back in — at the last checkpoint, with your lives intact, wearing the
+skins unlocked so far. Only a **Game Over** resets the run; an interruption (pause, reload,
+closing the browser) resumes it. **Nuova partita** starts fresh from level 1.
 
 ## Skins (sprite layering)
 
@@ -279,9 +301,15 @@ A "juiciness" + meta-game layer sits on top of the core game.
 All DOM/HTML is isolated in `index.html`, `style.css`, and `src/ui/`, so it never touches the
 collision logic in `game.js`:
 
-- **Insert Coin (no game-over).** Failing freezes the heroine and shows an HTML overlay;
-  **Inserisci Coin** adds 500 to `localStorage.totaleCoccoline` and restarts the level. The
-  debt is cumulative across the whole gift.
+- **Arcade lives + Insert Coin.** You start with **3 lives** (+1 **heart** `H` per level). A
+  failure freezes the heroine, banks **500 Coccoline** and spends a life; **Inserisci Coin**
+  respawns you from the last checkpoint. At **0 lives** a **Game Over** overlay restarts the
+  journey from level 1 with the score reset — but the Coccoline tab (`localStorage.totaleCoccoline`)
+  is **never** wiped, so the finale tallies every Coccolina across attempts.
+- **Global leaderboard.** Finishing posts your score (with a nickname) to a shared leaderboard
+  via a Vercel serverless function ([`api/leaderboard.js`](api/leaderboard.js)) backed by Upstash
+  Redis; the **Classifica** button (finale + menu) shows the Top 10. It **degrades gracefully**:
+  offline or unconfigured, the list just hides and the game plays on.
 - **Finale receipt → WhatsApp.** The Sala da Ballo shows a paper *Scontrino* with the total
   debt and a **Paga il Debito!** button that opens a pre-filled WhatsApp share.
 - **Game feel.** Squash & stretch, confetti on pickups, themed ambient particles, and

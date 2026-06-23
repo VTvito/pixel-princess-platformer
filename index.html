@@ -93,14 +93,29 @@
     </div>
 
     <!-- "Insert Coin" death overlay. DOM, not Kaplay; shown by
-         src/ui/insertCoin.js when the heroine fails. -->
+         src/ui/insertCoin.js when the heroine fails (with lives still left). -->
     <div id="coin-overlay" class="overlay" hidden>
       <div class="overlay-card coin-card">
         <p class="coin-text">
           Ops! Hai sbagliato.<br />
           Inserisci <strong>500 Coccoline</strong> per continuare.
         </p>
+        <p class="coin-lives">Vite rimaste: <span id="coin-lives-count">3</span> ♥</p>
         <button id="coin-btn" type="button" class="ui-btn">Inserisci Coin</button>
+      </div>
+    </div>
+
+    <!-- Game Over overlay: shown by src/ui/gameOver.js when the last life is lost. The run
+         restarts from level 1 (score wiped); the Coccoline tab deliberately keeps growing. -->
+    <div id="gameover-overlay" class="overlay" hidden>
+      <div class="overlay-card gameover-card">
+        <p class="gameover-title">Game Over</p>
+        <p class="coin-text">
+          Hai esaurito le vite!<br />
+          La principessa ricomincia il viaggio dall'inizio.<br />
+          <span class="gameover-note">(Le Coccoline restano sul conto 😉)</span>
+        </p>
+        <button id="gameover-btn" type="button" class="ui-btn">Ricomincia da capo</button>
       </div>
     </div>
 
@@ -117,6 +132,30 @@
         <p class="receipt-foot">Grazie per aver giocato ❤️</p>
         <button id="receipt-pay" type="button" class="ui-btn pay-btn">Paga il Debito!</button>
         <button id="receipt-close" type="button" class="ui-btn ghost-btn">Chiudi</button>
+      </div>
+    </div>
+
+    <!-- Global leaderboard overlay. DOM; shown by src/ui/leaderboard.js — submit mode from the
+         finale, read-only standings from the menu. Talks to /api/leaderboard (Vercel). -->
+    <div id="leaderboard-overlay" class="overlay" hidden>
+      <div class="overlay-card leaderboard-card">
+        <p class="pause-title">Classifica</p>
+        <div id="lb-form">
+          <p class="lb-prompt">Il tuo punteggio: <span id="lb-score">0</span> ★</p>
+          <input
+            id="nickname-input"
+            type="text"
+            maxlength="16"
+            placeholder="Il tuo nome"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+          <button id="lb-submit" type="button" class="ui-btn">Invia in classifica</button>
+        </div>
+        <ol id="lb-list" class="lb-list"></ol>
+        <p id="lb-status" class="lb-status"></p>
+        <button id="lb-close" type="button" class="ui-btn ghost-btn">Chiudi</button>
       </div>
     </div>
 

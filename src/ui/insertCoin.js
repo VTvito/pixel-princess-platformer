@@ -8,16 +8,22 @@
 
 let overlay = null;
 let button = null;
+let livesEl = null;
 
 function els() {
   overlay ||= document.getElementById("coin-overlay");
   button ||= document.getElementById("coin-btn");
+  livesEl ||= document.getElementById("coin-lives-count");
 }
 
-/** Show the death overlay. `onContinue` runs once, when the player inserts the coin. */
-export function showInsertCoin(onContinue) {
+/**
+ * Show the death overlay (only while the heroine still has lives left). `lives` is the count
+ * remaining after this death; `onContinue` runs once, when the player inserts the coin.
+ */
+export function showInsertCoin(lives, onContinue) {
   els();
   if (!overlay || !button) return;
+  if (livesEl) livesEl.textContent = String(lives);
   overlay.hidden = false;
   // Assign (not addEventListener) so repeated deaths never stack handlers.
   button.onclick = () => {

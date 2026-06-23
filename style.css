@@ -435,6 +435,98 @@ body.playing #pause-toggle {
 .coin-text strong {
   color: #c2410c; /* warm "debt" orange */
 }
+/* Lives line under the insert-coin text. */
+.coin-lives {
+  margin-top: 14px;
+  font-size: 20px;
+  color: #e7969a; /* rose, matching the in-game lives HUD */
+}
+.coin-lives span {
+  font-weight: 700;
+}
+
+/* Game Over card — the only "hard" failure state (out of lives). */
+.gameover-title {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #c2410c;
+  margin-bottom: 12px;
+}
+.gameover-note {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+/* Leaderboard card. */
+.leaderboard-card {
+  max-width: 420px;
+}
+.lb-prompt {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.lb-prompt span {
+  color: #d4af37;
+  font-weight: 700;
+}
+#nickname-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 20px;
+  font-family: "PixelifySans", sans-serif;
+  color: #26325c;
+  background: #fff;
+  border: 2px solid #d4af37;
+  border-radius: 12px;
+  text-align: center;
+  outline: none;
+}
+#nickname-input:focus {
+  border-color: #e7969a;
+}
+.lb-list {
+  list-style: none;
+  margin: 18px 0 6px;
+  padding: 0;
+  text-align: left;
+}
+.lb-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 18px;
+}
+.lb-list li:nth-child(odd) {
+  background: rgba(38, 50, 92, 0.06);
+}
+.lb-list li.lb-me {
+  background: rgba(231, 150, 173, 0.28); /* rose tint for the player's own row */
+  font-weight: 700;
+}
+.lb-rank {
+  width: 26px;
+  text-align: right;
+  opacity: 0.6;
+}
+.lb-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-pts {
+  color: #d4af37;
+  font-weight: 700;
+}
+.lb-status {
+  min-height: 22px;
+  font-size: 16px;
+  opacity: 0.8;
+}
 
 /* Receipt card — styled like a paper thermal receipt. */
 .receipt-card {

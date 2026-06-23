@@ -112,16 +112,20 @@ export const LEVEL_4 = {
       // above comfortable. Kept OFF the walk line (row 7, not row 9): you only reach it by
       // choosing to jump for the secret, so the flat-ridge walk to the climax is untouched.
       { x: 63, y: 7, ch: "+" },
-      // Checkpoints: after the intro ice, mid-level, and right before the great chasm.
-      { x: 26, y: LANE, ch: "F" },
+      // Arcade: thinned to two — mid-level (x46) and right before the great chasm (x100). The
+      // old early x26 flag is gone, so the intro ice + first terrace is banked only from spawn.
       { x: 46, y: LANE, ch: "F" },
       { x: 100, y: LANE, ch: "F" },
+      // A hopper on the flat intro ice — its timed arc plus the slide makes a fresh wrinkle.
+      { x: 10, y: LANE, ch: "h" },
       // Ice spikes on the lane.
       { x: 22, y: LANE, ch: "^" },
       { x: 35, y: 10, ch: "^" }, // on the first terrace's edge — room to accelerate on ice
       { x: 40, y: LANE, ch: "^" }, // post-terrace flat, clear of the x44 stalattite column
       { x: 92, y: LANE, ch: "^" },
       // (No star before the ridge anymore — the stalactite timing and the roller bite now.)
+      // Arcade: the level's heart (+1 vita), on the flat lane just past the x46 checkpoint.
+      { x: 48, y: LANE - 1, ch: "H" },
       ...arcCollectibles([6, 12, 20, 42, 50, 56, 78, 88, 102], [AIR, LANE - 1]),
       // The crystal hoard on the secret shelf.
       { x: 62, y: 5, ch: "o" },

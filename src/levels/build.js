@@ -6,12 +6,13 @@
 //
 // Tile legend: "=" solid  "^" hazard (thorns/urchins)  "o" collectible  "*" star power-up
 //              "c" crab enemy  "f" flyer enemy (air)  "s" stalactite hazard (falls)
+//              "h" hopper enemy (Rospo Saltatore: hops in timed arcs on the ground)
 //              "#" semisolid one-way platform   "M" spring mushroom   "!" crumble platform
 //              "F" checkpoint flag   "g" swooper (diving ghost)   "r" roller (chasing ball)
 //              "w" updraft column cell   "B" breeze column cell (horizontal petal current)
 //              "P" pendulum chandelier (anchor cell; the lethal bob swings below)
 //              "S" armored swooper (2-hp diving guardian — enrages on a stomp)
-//              "+" feather (high-jump power-up)
+//              "+" feather (high-jump power-up)   "H" heart (arcade life: +1 vita)
 //              "G" Gargoyle Custode (mini-boss: a 2x stone swooper with 3 hp)
 //              "@" spawn   ">" goal   " " air (a gap in the ground rows is a ravine)
 // Moving platforms are not ASCII: a level may add `movers: [{x,y,w,dx,dy,period,phase}]`
@@ -142,11 +143,17 @@ export function buildLevel(def) {
         case "+":
           makeFeather(x + TILE / 2, y + TILE / 2);
           break;
+        case "H":
+          makeHeart(x + TILE / 2, y + TILE / 2);
+          break;
         case "c":
           makeCrab(x + TILE / 2, y + TILE / 2, theme);
           break;
         case "f":
           makeFlyer(x + TILE / 2, y + TILE / 2, theme);
+          break;
+        case "h":
+          makeHopper(x + TILE / 2, y + TILE / 2, theme);
           break;
         case "s":
           makeStalactite(x, y, TILE, theme, worldH);
@@ -815,6 +822,38 @@ function makeFeather(cx, cy) {
   return item;
 }
 
+// --- Heart pickup (Fase Arcade): grabbing it grants +1 life (the game scene caps it). Drawn
+// from primitives like the star/feather — an invisible circle collider tagged "heart" + a
+// child heart silhouette (two lobes + a rotated square point) and a warm aura — so it needs no
+// art asset and reads the same in every theme. Bobs gently. One per level (see level data).
+function makeHeart(cx, cy) {
+  const COL = [232, 76, 110]; // warm heart red-rose (matches the lives HUD)
+  const item = k.add([
+    k.circle(14),
+    k.opacity(0),
+    k.pos(cx, cy),
+    k.anchor("center"),
+    k.area({ scale: 1.15 }), // generous — a life pickup should feel kind
+    k.z(3),
+    "heart",
+    { baseY: cy, t: k.rand(0, Math.PI * 2) },
+  ]);
+  const halo = item.add([
+    k.circle(20), k.color(...COL), k.anchor("center"), k.pos(0, 0), k.opacity(0.18), k.z(2),
+  ]);
+  // Classic two-lobe heart: two circles for the humps + a square rotated 45° for the point.
+  const heart = item.add([k.pos(0, 0), k.z(3)]);
+  heart.add([k.circle(6), k.color(...COL), k.anchor("center"), k.pos(-4, -3)]);
+  heart.add([k.circle(6), k.color(...COL), k.anchor("center"), k.pos(4, -3)]);
+  heart.add([k.rect(11, 11), k.color(...COL), k.anchor("center"), k.pos(0, 1), k.rotate(45)]);
+  item.onUpdate(() => {
+    item.t += k.dt() * 3;
+    item.pos.y = item.baseY + Math.sin(item.t) * 6; // bob
+    halo.opacity = 0.14 + 0.14 * (0.5 + 0.5 * Math.sin(item.t * 2)); // pulse
+  });
+  return item;
+}
+
 // --- Crab enemy: patrols horizontally, tagged "enemy". Primitive art (no asset needed).
 function makeCrab(cx, cy, theme) {
   // Collider-only invisible body (same 40×24 hitbox + "enemy" tag + patrol state); the crab
@@ -867,6 +906,71 @@ function makeFlyer(cx, cy, theme) {
     flyer.pos.y = flyer.baseY + Math.sin(flyer.t) * ENEMIES.FLY_BOB;
   });
   return flyer;
+}
+
+// --- Hopper enemy (Rospo Saltatore, Fase Arcade): a ground toad that rests, then springs in a
+// timed arc — opening and closing a passable gap (jump over it, or run under its apex). Tagged
+// "enemy" so the scene's standard Mario rules apply (stomp from above defeats it; side/below
+// contact is lethal) — zero changes needed in game.js. Motion is a simple hand-integrated arc
+// off a fixed baseline (baseY), like the swooper/roller (no physics body): place hoppers on
+// FLAT ground so the baseline reads true. Drawn from primitives (no art asset). Units from
+// ENEMIES.HOPPER_* (config.js).
+function makeHopper(cx, cy, theme) {
+  const GREEN = [96, 168, 88];
+  const hopper = k.add([
+    k.rect(34, 28, { radius: 11 }),
+    k.opacity(0),
+    k.pos(cx, cy),
+    k.anchor("center"),
+    k.area({ scale: 0.9 }),
+    k.z(4),
+    "enemy",
+    // rest counts down on the ground; a random start so a row of hoppers doesn't pulse in sync.
+    { baseX: cx, baseY: cy, dir: 1, vy: 0, airborne: false, rest: k.rand(0, ENEMIES.HOPPER_INTERVAL) },
+  ]);
+  // Toad art (squash-and-stretch container so the hop has weight).
+  const art = hopper.add([k.pos(0, 0), k.scale(1), k.anchor("center"), k.z(4)]);
+  art.add([k.circle(15), k.color(...GREEN), k.anchor("center"), k.pos(0, 0)]); // body
+  art.add([k.circle(9), k.color(186, 222, 150), k.anchor("center"), k.pos(0, 5), k.opacity(0.85)]); // belly
+  const eyeL = art.add([k.circle(5), k.color(...GREEN), k.anchor("center"), k.pos(-7, -12)]);
+  const eyeR = art.add([k.circle(5), k.color(...GREEN), k.anchor("center"), k.pos(7, -12)]);
+  eyeL.add([k.circle(3), k.color(255, 255, 255), k.anchor("center"), k.pos(0, 0)]);
+  eyeL.add([k.circle(1.6), k.color(24, 36, 24), k.anchor("center"), k.pos(1, 0)]);
+  eyeR.add([k.circle(3), k.color(255, 255, 255), k.anchor("center"), k.pos(0, 0)]);
+  eyeR.add([k.circle(1.6), k.color(24, 36, 24), k.anchor("center"), k.pos(-1, 0)]);
+
+  hopper.onUpdate(() => {
+    const dt = k.dt();
+    if (!hopper.airborne) {
+      // Resting: ease back to the natural shape, then launch when the timer runs out. Decide
+      // the leap direction here (flip if we've drifted past a patrol bound) and keep it for the
+      // whole arc so the jump reads as one clean hop.
+      art.scale = k.vec2(1, 1);
+      hopper.rest -= dt;
+      if (hopper.rest <= 0) {
+        if (hopper.pos.x > hopper.baseX + ENEMIES.HOPPER_RANGE) hopper.dir = -1;
+        else if (hopper.pos.x < hopper.baseX - ENEMIES.HOPPER_RANGE) hopper.dir = 1;
+        hopper.vy = -ENEMIES.HOPPER_JUMP_VEL;
+        hopper.airborne = true;
+      }
+      return;
+    }
+    // Airborne: integrate a simple gravity arc; squash/stretch from vertical speed (taller on
+    // the way up, flatter on the way down) gives the hop a springy weight.
+    hopper.vy += PHYSICS.GRAVITY * dt;
+    hopper.pos.y += hopper.vy * dt;
+    hopper.pos.x += hopper.dir * ENEMIES.HOPPER_HOP_DX * dt;
+    const s = Math.max(-0.22, Math.min(0.22, -hopper.vy / 1800));
+    art.scale = k.vec2(1 - s, 1 + s);
+    if (hopper.pos.y >= hopper.baseY) {
+      // Landed: snap to the baseline and rest before the next hop.
+      hopper.pos.y = hopper.baseY;
+      hopper.vy = 0;
+      hopper.airborne = false;
+      hopper.rest = ENEMIES.HOPPER_INTERVAL;
+    }
+  });
+  return hopper;
 }
 
 // --- Stalactite hazard (stalattite, Livello 4): an icicle that hangs from the ceiling and

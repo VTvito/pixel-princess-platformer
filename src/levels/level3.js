@@ -95,11 +95,13 @@ export const LEVEL_3 = {
       // swoopers' columns: an air enemy overhead would block the hop exactly where the
       // alley dives demand one.
       { x: 61, y: 3, ch: "g" },
-      // Checkpoints thinned to two (a death costs more progress now): before the alley and
-      // before the staircase. The old early x28 flag (end of the first roof) is gone — the
-      // climb up the two roofs is banked only from the spawn.
+      // Arcade: a SINGLE checkpoint before the swooper alley (the riskiest stretch — diving
+      // ghosts over the x62 ravine). The crumbling-ridge climax beyond it is survivable (the
+      // street below is safe), so it's banked only from here.
       { x: 46, y: LANE, ch: "F" },
-      { x: 78, y: LANE, ch: "F" },
+      // First level to feature the Rospo Saltatore: a lone hopper on the flat intro street
+      // introduces its timed arc gently, before the thorn at x12.
+      { x: 9, y: LANE, ch: "h" },
       // Broken-tile spikes: street, both roofs, and the post-ridge landing zone.
       { x: 12, y: LANE, ch: "^" },
       { x: 20, y: LANE, ch: "^" }, // a second street spike before the first climb
@@ -110,6 +112,8 @@ export const LEVEL_3 = {
       { x: 74, y: LANE, ch: "^" }, // post-alley spike, clear of the x68 swooper's dive range
       { x: 112, y: LANE, ch: "^" },
       // (No star before the alley anymore — the swoopers must be timed/dodged, not bulldozed.)
+      // Arcade: the level's heart (+1 vita), on the flat post-ridge run before the goal.
+      { x: 109, y: LANE - 1, ch: "H" },
       ...arcCollectibles([6, 14, 20, 31, 42, 52, 66, 74, 86, 107, 114], [AIR, LANE - 1]),
       // Lanterns strung along the secret ridgeline.
       { x: 50, y: 5, ch: "o" },

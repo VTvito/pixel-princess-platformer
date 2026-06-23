@@ -6,11 +6,13 @@
 
 import { k } from "../kaplayCtx.js";
 import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE } from "../config.js";
-import { getSelectedCharacter, getCoccoline, getCoccolineRun } from "../state.js";
+import { getSelectedCharacter, getCoccoline, getCoccolineRun, getScore } from "../state.js";
 import { addSkinLayers, syncSkins } from "../entities/player.js";
 import { resetInput } from "../controls.js";
 import { showReceipt, hideReceipt } from "../ui/receipt.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
+import { hideGameOver } from "../ui/gameOver.js";
+import { openLeaderboard, hideLeaderboard } from "../ui/leaderboard.js";
 import { hidePause } from "../ui/pauseMenu.js";
 import { hideSettings } from "../ui/settings.js";
 import { fadeToScene } from "../ui/transition.js";
@@ -27,7 +29,9 @@ export function registerFinaleScene() {
   k.scene("finale", () => {
     // Defensive: clear any leftover death overlay; the receipt is shown below after a beat.
     hideInsertCoin();
+    hideGameOver();
     hideReceipt();
+    hideLeaderboard();
     hidePause();
     hideSettings();
     // Cinematic scene — no controls; keep the gameplay touch buttons hidden.
@@ -134,6 +138,37 @@ export function registerFinaleScene() {
     };
     btn.onClick(toMenu);
     k.onKeyPress(["enter", "space", "escape"], toMenu);
+
+    // Leaderboard entry: a top-right button opens the global classifica (submit mode) with the
+    // journey's final score. Kept out of the centred message/receipt so the heartfelt note
+    // still comes first — the player chooses to enter her name and compare with the world.
+    // Top-LEFT corner: the top-right is occupied by the DOM 🎵/🔊 audio toggles, and the pause
+    // button (top-left) is hidden in this non-playing scene, so the corner is free.
+    const lbBtn = k.add([
+      k.rect(248, 56, { radius: 12 }),
+      k.pos(148, 52),
+      k.anchor("center"),
+      k.area(),
+      k.color(...PALETTE.cream),
+      k.z(30),
+    ]);
+    lbBtn.add([
+      k.text("★ Classifica", { size: 22, font: "sans-serif" }),
+      k.anchor("center"),
+      k.color(...PALETTE.deepBlue),
+    ]);
+    lbBtn.onHover(() => {
+      lbBtn.scale = k.vec2(1.05);
+      k.setCursor("pointer");
+    });
+    lbBtn.onHoverEnd(() => {
+      lbBtn.scale = k.vec2(1);
+      k.setCursor("default");
+    });
+    lbBtn.onClick(() => {
+      sfx("select");
+      openLeaderboard({ score: getScore() });
+    });
 
     // The payoff: the receipt is a full-screen overlay that covers the heartfelt
     // message, so hold it back long enough to actually READ the journey note first (it used

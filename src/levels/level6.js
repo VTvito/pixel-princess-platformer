@@ -53,8 +53,8 @@ export const LEVEL_6 = {
     ],
   },
 
-  // Authored decor: armour flanking the entrance, candelabra at the checkpoints, the
-  // royal banner beside the ballroom doors.
+  // Authored decor: armour flanking the entrance, candelabra along the hall (two by the
+  // x66/x90 checkpoints), the royal banner beside the ballroom doors.
   decor: [
     { x: 5, y: LANE, key: "deco_armor" },
     { x: 40, y: LANE, key: "deco_candelabra" },
@@ -107,13 +107,14 @@ export const LEVEL_6 = {
       { x: 87, y: 8, ch: "!" },
       { x: 86, y: 7, ch: "o" },
       { x: 87, y: 7, ch: "o" },
-      // Checkpoints: clean run-up ahead of each (the pendulum lessons of L1-4).
-      // Thinned out: the doubled-up x96 flag is gone, so the gauntlet + staircase are banked
-      // only at x90 — surviving the final approach now means more on the line.
-      { x: 22, y: LANE, ch: "F" },
-      { x: 40, y: LANE, ch: "F" },
+      // Arcade: the final chapter keeps just TWO checkpoints, banking the two hardest stretches
+      // tightly — before the chandelier gauntlet (x66) and before the grand-staircase climax
+      // (x90). The whole front (intro + chandelier 1 + the cellar-pit glider) is now a single
+      // run from spawn: surviving the castle means more on the line. Clean run-up ahead of each.
       { x: 66, y: LANE, ch: "F" },
       { x: 90, y: LANE, ch: "F" },
+      // A hopper on the flat approach to the cellar pit (front run, after chandelier 1).
+      { x: 52, y: LANE, ch: "h" },
       // Steel spike racks on the flagstones.
       { x: 12, y: LANE, ch: "^" },
       { x: 46, y: LANE, ch: "^" },
@@ -136,6 +137,9 @@ export const LEVEL_6 = {
       // out for the hardest timing gate (pendulum 2 + the armored ghost), but its window is
       // short (POWERUP.DURATION 5s) so it's a breather, not a "win button".
       { x: 74, y: LANE, ch: "*" },
+      // Arcade: the level's heart (+1 vita), on the flat by candelabra x40 — a life banked
+      // before the long from-spawn front run into the gauntlet.
+      { x: 42, y: LANE - 1, ch: "H" },
       ...arcCollectibles([6, 15, 26, 38, 44, 54, 68, 76, 86, 94], [AIR, LANE - 1]),
       // Goblets up the staircase.
       { x: 105, y: 9, ch: "o" },

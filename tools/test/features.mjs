@@ -302,6 +302,10 @@ try {
     `x=${Math.round(respawnX)} vs flag=${flagX}`,
   );
 
+  // --- Fase Arcade: that same death also spent a life (start LIVES.START=3 → 2). ---
+  const livesAfterDeath = await page.evaluate(() => localStorage.getItem("pj.lives"));
+  check("a death costs a life", livesAfterDeath === "2", `pj.lives=${livesAfterDeath}`);
+
   // --- Phase-4 crumble platforms (Livello 3): stand on one → it shakes, falls away,
   // then reforms a few seconds later. ---
   await page.evaluate(() => localStorage.setItem("pj.currentLevel", "3"));
@@ -430,6 +434,89 @@ try {
     JSON.stringify(avatarState),
   );
   await page.screenshot({ path: SHOT });
+
+  // --- Fase Arcade: hearts grant a life, and losing them all triggers Game Over (back to
+  // level 1, score wiped, Coccoline tab KEPT). Run last, so the earlier finale-receipt
+  // assertion still sees only the single 500 from the §1 death. ---
+  await page.evaluate(() => {
+    localStorage.setItem("pj.currentLevel", "1");
+    localStorage.setItem("pj.lives", "3");
+    localStorage.setItem("pj.score", "0");
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__pj?.k && window.__pj.k.getSceneName() === "menu", null, { timeout: T, polling: 100 });
+  await page.evaluate(() => window.__pj.k.go("game"));
+  await page.waitForFunction(
+    () =>
+      window.__pj.k.getSceneName() === "game" &&
+      window.__pj.k.get("player").length > 0 &&
+      window.__pj.k.get("heart").length > 0,
+    null,
+    { timeout: T, polling: 100 },
+  );
+  const heartProbe = await page.evaluate(async () => {
+    const k = window.__pj.k;
+    const p = k.get("player")[0];
+    const h = k.get("heart")[0];
+    const before = Number(localStorage.getItem("pj.lives"));
+    p.pos.x = h.pos.x;
+    p.pos.y = h.pos.y; // overlap → pickup
+    await new Promise((r) => setTimeout(r, 250));
+    return {
+      ok: !h.exists() && Number(localStorage.getItem("pj.lives")) === before + 1,
+      before,
+      after: localStorage.getItem("pj.lives"),
+    };
+  });
+  check("heart grants +1 life", heartProbe.ok, `${heartProbe.before}→${heartProbe.after}`);
+
+  // Spend every life: each death banks 500 + a life; at 0 the Game Over overlay appears.
+  const over = await page.evaluate(async () => {
+    const k = window.__pj.k;
+    const seeCoin = () => !document.getElementById("coin-overlay").hidden;
+    const seeOver = () => !document.getElementById("gameover-overlay").hidden;
+    for (let i = 0; i < 8; i++) {
+      const pl = k.get("player")[0];
+      if (pl) pl.pos.y = 999999; // fall off the world → die
+      const t0 = Date.now();
+      while (Date.now() - t0 < 2500 && !seeCoin() && !seeOver()) await new Promise((r) => setTimeout(r, 50));
+      if (seeOver()) return { reached: true };
+      if (seeCoin()) {
+        document.getElementById("coin-btn").click();
+        const t1 = Date.now();
+        while (
+          Date.now() - t1 < 2500 &&
+          (k.getSceneName() !== "game" || seeCoin() || k.get("player").length === 0)
+        ) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
+    }
+    return { reached: seeOver() };
+  });
+  check("losing all lives shows Game Over", over.reached);
+  const reset = await page.evaluate(() => ({
+    level: localStorage.getItem("pj.currentLevel"),
+    score: localStorage.getItem("pj.score"),
+    lives: localStorage.getItem("pj.lives"),
+    coccoline: Number(localStorage.getItem("totaleCoccoline")),
+  }));
+  check("Game Over resets to level 1", reset.level === "1", `level=${reset.level}`);
+  check("Game Over wipes the score", reset.score === "0", `score=${reset.score}`);
+  check("Game Over refills lives", reset.lives === "3", `lives=${reset.lives}`);
+  check("Game Over keeps the Coccoline tab", reset.coccoline > 0, `coccoline=${reset.coccoline}`);
+
+  // The Game Over button restarts the journey at level 1.
+  await page.click("#gameover-btn");
+  await page.waitForFunction(
+    () =>
+      window.__pj.k.getSceneName() === "game" &&
+      document.getElementById("gameover-overlay").hidden &&
+      window.__pj.k.get("player").length > 0,
+    null,
+    { timeout: T, polling: 100 },
+  );
+  check("Game Over restart boots a fresh run", true);
 
   // --- Report ---
   let allOk = errors.length === 0;

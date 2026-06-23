@@ -26,12 +26,21 @@ import {
   addCoccoline,
   addScore,
   getScore,
+  getLives,
+  addLife,
+  loseLife,
+  getCheckpoint,
+  setCheckpoint,
+  clearCheckpoint,
+  resetRun,
 } from "../state.js";
 import { bindKeyboard, resetInput } from "../controls.js";
 import { makePlayer, addSkinLayers, syncSkins } from "../entities/player.js";
 import { getLevelDef, hasLevel } from "../levels/index.js";
 import { buildLevel } from "../levels/build.js";
 import { showInsertCoin, hideInsertCoin } from "../ui/insertCoin.js";
+import { showGameOver, hideGameOver } from "../ui/gameOver.js";
+import { hideLeaderboard } from "../ui/leaderboard.js";
 import { showPause, hidePause } from "../ui/pauseMenu.js";
 import { showSettings, hideSettings } from "../ui/settings.js";
 import { hideReceipt } from "../ui/receipt.js";
@@ -53,12 +62,17 @@ function focusCanvas() {
   canvas?.focus?.();
 }
 
-// Checkpoint memory (Phase 4): survives the k.go("game") restart that the Insert
-// Coin flow uses, but resets when the level changes or the scene is entered fresh from
-// the menu (so "Nuova partita" can never inherit a stale checkpoint).
+// Checkpoint memory (Phase 4): survives the k.go("game") restart that the death flow
+// uses, but resets when the level changes or the scene is entered fresh from the menu (so
+// "Nuova partita" can never inherit a stale checkpoint). It is ALSO mirrored to localStorage
+// (src/state.js) so an interruption — reload, closing the browser, menu→resume — picks the
+// level back up from the last flag (see the entry logic below).
 let checkpointAt = null;
 let checkpointLevel = 0;
 let respawningFromDeath = false;
+// Set by the pause menu's "Ricomincia il livello": a voluntary do-over starts at the level's
+// spawn, ignoring the persisted checkpoint for this one entry (the checkpoint itself is kept).
+let forceSpawn = false;
 
 export function registerGameScene() {
   k.scene("game", () => {
@@ -66,7 +80,9 @@ export function registerGameScene() {
     // world is running (a previous pause always unfreezes before leaving, but re-entry
     // resets it too so a stale pause can never carry over).
     hideInsertCoin();
+    hideGameOver();
     hideReceipt();
+    hideLeaderboard();
     hidePause();
     hideSettings();
     k.getTreeRoot().paused = false;
@@ -95,9 +111,18 @@ export function registerGameScene() {
     // Build the tile map (platforms, ravines, hazards, collectibles, enemies, goal).
     const { spawn, worldW, worldH, collectiblesTotal } = buildLevel(def);
 
-    // Respawn at the last touched checkpoint only when coming back from a death on this
-    // same level; any other entry starts clean from the level's spawn point.
+    // Where does the heroine start?
+    //  • A death-retry on this same level resumes from the in-memory checkpoint.
+    //  • Any OTHER entry (menu "Riprendi", a reload, reopening the browser) falls back to the
+    //    PERSISTED checkpoint for this level, so an interruption picks up mid-level.
+    //  • A brand-new game ("Nuova partita") cleared the checkpoint, and a voluntary pause
+    //    restart (forceSpawn) ignores it for this one entry → both start at the level's spawn.
     if (!respawningFromDeath || checkpointLevel !== level) checkpointAt = null;
+    if (!checkpointAt && !forceSpawn) {
+      const cp = getCheckpoint();
+      if (cp && cp.level === level) checkpointAt = { x: cp.x, y: cp.y };
+    }
+    forceSpawn = false;
     checkpointLevel = level;
     respawningFromDeath = false;
     const startPos = checkpointAt ? k.vec2(checkpointAt.x, checkpointAt.y) : spawn;
@@ -148,9 +173,21 @@ export function registerGameScene() {
       player.paused = true; // freeze the heroine behind the overlay
       sfx("oops"); // gentle "you slipped" cue (no harsh game-over)
       resetInput();
-      showInsertCoin(() => {
+      addCoccoline(500); // the bill is sacred — every slip costs 500, banked immediately
+      const left = loseLife(); // …and a life
+      if (left <= 0) {
+        // Out of lives: the run is over. Reset progress back to level 1 (score wiped, lives
+        // refilled, checkpoint cleared) — but the Coccoline tab keeps growing — then offer a
+        // restart from the very beginning.
+        resetRun();
+        showGameOver(() => {
+          respawningFromDeath = false; // fresh start from level 1's spawn, no checkpoint
+          fadeToScene(() => k.go("game"));
+        });
+        return;
+      }
+      showInsertCoin(left, () => {
         sfx("coin"); // arcade-coin chime as the debt is banked
-        addCoccoline(500);
         respawningFromDeath = true; // the restart below may resume from a checkpoint
         k.go("game"); // restart the current level (from the last checkpoint, if any)
       });
@@ -215,6 +252,7 @@ export function registerGameScene() {
       flag.activated = true;
       // Same semantics as the spawn point: x centred on the pole, y = the lane cell top.
       checkpointAt = { x: flag.pos.x + 32, y: flag.pos.y + 64 };
+      setCheckpoint({ level, x: checkpointAt.x, y: checkpointAt.y }); // survive a browser close
       flag.art?.use(k.color(255, 200, 150)); // the pennant warms up once it's yours
       confettiBurst(k.vec2(flag.pos.x + 32, flag.pos.y + 40), [PALETTE.gold, PALETTE.cream, PALETTE.rose]);
       sfx("checkpoint");
@@ -358,6 +396,17 @@ export function registerGameScene() {
       addScore(amount);
       scoreLabel.text = `★ ${getScore()}`;
     };
+    // Lives (arcade): a compact heart count, top-right under the score. ♥ isn't in the pixel
+    // font → sans-serif. Updated on a heart pickup; a death leaves the scene and re-enters.
+    const livesLabel = k.add([
+      k.text(`♥ ${getLives()}`, { size: 22, font: "sans-serif" }),
+      k.pos(GAME_W - 24, 88),
+      k.anchor("topright"),
+      k.color(...PALETTE.rose),
+      k.fixed(),
+      k.z(50),
+    ]);
+    const updateLives = () => (livesLabel.text = `♥ ${getLives()}`);
     // Invincibility indicator (top centre): shown only while a star is active, counting down.
     const invLabel = k.add([
       // sans-serif: shows "★ INVINCIBILE …" and the ★ glyph isn't in the pixel font.
@@ -425,11 +474,22 @@ export function registerGameScene() {
       bumpScore(SCORE.PICKUP);
     });
 
+    // --- Hearts (arcade lives): a heart grants +1 life (capped at LIVES.MAX in state) ---
+    player.onCollide("heart", (h) => {
+      if (finished || dead) return;
+      confettiBurst(h.pos, [PALETTE.rose, PALETTE.cream, PALETTE.gold]);
+      sfx("collect");
+      k.destroy(h);
+      addLife();
+      updateLives();
+    });
+
     // --- Goal: unlock a skin, advance progress, continue to the next level ---
     player.onCollide("goal", () => {
       if (finished || dead) return;
       finished = true;
       checkpointAt = null; // the journey continues — next level starts clean
+      clearCheckpoint(); // …and the persisted one is spent (lives carry over to the next level)
       player.setAnim("celebrate"); // arms up while the reward card shows
       sfx("goal"); // triumphant arpeggio on clearing the level
       // The last chapter's doors deserve fireworks: staggered confetti around her.
@@ -489,6 +549,7 @@ export function registerGameScene() {
           hidePause();
           setFrozen(false);
           respawningFromDeath = false; // full restart from the level's start, not a checkpoint
+          forceSpawn = true; // …and ignore the persisted checkpoint for this one entry
           fadeToScene(() => k.go("game"));
         },
         onMenu: () => {

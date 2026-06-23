@@ -8,14 +8,15 @@ import {
   setSelectedCharacter,
   getSelectedCharacter,
   getCurrentLevel,
-  setCurrentLevel,
-  resetScore,
+  resetRun,
   resetCoccolineRun,
 } from "../state.js";
 import { getLevelDef } from "../levels/index.js";
 import { drawBackground } from "./game.js";
 import { fadeToScene } from "../ui/transition.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
+import { hideGameOver } from "../ui/gameOver.js";
+import { openLeaderboardReadOnly, hideLeaderboard } from "../ui/leaderboard.js";
 import { hidePause } from "../ui/pauseMenu.js";
 import { showSettings, hideSettings } from "../ui/settings.js";
 import { hideReceipt } from "../ui/receipt.js";
@@ -57,7 +58,9 @@ export function registerMenuScene() {
   k.scene("menu", () => {
     // Defensive: clear any DOM overlay left over from gameplay / the finale.
     hideInsertCoin();
+    hideGameOver();
     hideReceipt();
+    hideLeaderboard();
     hidePause();
     hideSettings();
     // Hide the gameplay touch controls so they never cover the menu's character cards.
@@ -174,7 +177,20 @@ export function registerMenuScene() {
       });
     }
 
-    // Settings (volume) — bottom of the start screen, hidden once the chooser opens.
+    // Leaderboard (read-only standings) + Settings (volume) — bottom of the start screen,
+    // hidden once the chooser opens.
+    makeButton(startLayer, {
+      x: GAME_W / 2,
+      y: GAME_H - 120,
+      w: 220,
+      h: 56,
+      label: "Classifica",
+      onClick: () => {
+        sfx("select");
+        openLeaderboardReadOnly();
+      },
+      base: PALETTE.cream,
+    });
     makeButton(startLayer, {
       x: GAME_W / 2,
       y: GAME_H - 56,
@@ -266,8 +282,7 @@ export function registerMenuScene() {
       card.onClick(() => {
         if (!chooserActive) return; // ignore the click that opened the chooser
         setSelectedCharacter(char.id);
-        setCurrentLevel(1);   // "Nuova partita" always begins the journey from level 1
-        resetScore();         // a fresh journey starts from zero points
+        resetRun();           // fresh journey: level 1, score 0, full lives, no stale checkpoint
         resetCoccolineRun();  // ...and a fresh bill (the lifetime total keeps counting)
         playBgm("bgm-forest", 0.32); // level 1's track, started within this gesture
         sfx("select");

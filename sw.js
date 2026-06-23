@@ -9,7 +9,7 @@
 // Updating: bump CACHE on a meaningful content change. The byte change to this file makes the
 // browser install the new worker, which (skipWaiting + clients.claim) activates immediately
 // and the activate handler deletes the old cache, so the new content is fetched fresh.
-const CACHE = "pj-v4";
+const CACHE = "pj-v5";
 
 // The shell that must be available even if the first visit was interrupted. Everything else
 // (src modules, assets, fonts, vendored Kaplay) is cached lazily on first fetch below.
@@ -36,6 +36,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return; // never cache POST/etc.
+  // The leaderboard API is live data — never cache it (a cached GET would freeze the standings
+  // and serve stale entries). Let it hit the network; offline, the client degrades gracefully.
+  if (new URL(req.url).pathname.startsWith("/api/")) return;
   event.respondWith(
     caches.match(req).then(
       (hit) =>
