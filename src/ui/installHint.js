@@ -54,6 +54,7 @@ export function bindInstallHint() {
   }
   el.hidden = false;
   // Auto-fade after a while so it never lingers over gameplay (not persisted — only an
-  // explicit close stops it returning next session).
-  window.setTimeout(hide, 9000);
+  // explicit close stops it returning next session). Il banner ora è un passo-passo su due
+  // righe (Condividi → "Aggiungi a Home"): più testo da leggere, quindi più tempo a video.
+  window.setTimeout(hide, 14000);
 }

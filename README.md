@@ -5,7 +5,7 @@ A personalized 2D platformer gift, built with [Kaplay](https://kaplayjs.com/)
 step, no CDN at runtime).
 
 The full journey is playable: a responsive landscape canvas, a main menu with character
-selection (Anna / La Sognatrice / L'Avventuriera), **six** themed platformer levels with a
+selection (Anna / Belle / Jasmine), **six** themed platformer levels with a
 clothing-skin progression, and the **Sala da Ballo** finale — all with `localStorage`
 progress.
 

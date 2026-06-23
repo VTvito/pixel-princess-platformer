@@ -100,7 +100,10 @@ export function registerFinaleScene() {
       k.z(21),
     ]);
     k.add([
-      k.text(FINALE.message, { size: 18, width: boxW - 72, align: "center", lineSpacing: 4 }),
+      // The heartfelt letter is the one place the pixel font hurt readability (long-form text),
+      // so this single object overrides to "sans-serif" — the same per-object escape hatch the
+      // emoji labels use. Titles + the button above/below stay pixel for the fairy-tale look.
+      k.text(FINALE.message, { size: 18, width: boxW - 72, align: "center", lineSpacing: 4, font: "sans-serif" }),
       k.pos(GAME_W / 2, boxY + 22),
       k.anchor("center"),
       k.color(...PALETTE.deepBlue),
