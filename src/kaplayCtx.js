@@ -15,8 +15,14 @@ import { GAME_W, GAME_H, PALETTE } from "./config.js";
 // keeps min(dpr, 2) for crisp HUD text where the GPU budget is there.
 // Exported so gameplay can lighten per-frame work on touch devices (e.g. fewer ambient
 // particles — see src/scenes/game.js), where the GPU/CPU budget is tighter than desktop.
+// Detect touch/mobile robustly: `pointer: coarse` is the usual signal, but some iOS browser
+// configs report it inconsistently — `navigator.maxTouchPoints > 0` is true on every iPhone/iPad,
+// so OR-ing it in guarantees the mobile render path (density 1, fewer particles, fps cap) actually
+// engages on the device. A desktop with a touchscreen also takes this path — a harmless trade.
 export const coarsePointer =
-  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
+  typeof window !== "undefined" &&
+  (window.matchMedia?.("(pointer: coarse)")?.matches ||
+    (typeof navigator !== "undefined" && (navigator.maxTouchPoints || 0) > 0));
 
 // Effective simulation-rate cap. Default: 60 on touch (steady pacing — see the maxFPS note
 // below), uncapped on desktop. A `?maxfps=` URL override lets us A/B the cap ON THE DEVICE,

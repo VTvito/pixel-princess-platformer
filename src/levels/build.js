@@ -94,7 +94,7 @@ export function buildLevel(def) {
           // Bright grass/snow cap on exposed top surfaces: a transparent pixel overlay with
           // blades, tinted theme.solidTop (keeps the faithful two-tone surface look).
           if (airAbove) {
-            k.add([k.sprite(c % 2 ? "grass_cap_2" : "grass_cap"), k.pos(x, y), k.color(...theme.solidTop), k.z(1)]);
+            k.add([k.sprite(c % 2 ? "grass_cap_2" : "grass_cap"), k.pos(x, y), k.color(...theme.solidTop), k.z(1), "scenery"]);
             // Ground tops (not floating slabs) with truly empty air above can host a
             // decor prop — anything in the cell above (item/hazard/spawn/goal) vetoes it.
             if (!airBelow && (rows[r - 1]?.[c] ?? " ") === " ") decorSpots.push({ c, r });

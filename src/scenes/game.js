@@ -155,6 +155,25 @@ export function registerGameScene() {
       setCam(k.vec2(Math.round(camX), Math.round(camY)));
     });
 
+    // --- Off-screen culling (the mobile fluidity fix) -----------------------------------
+    // On iOS WebKit each sprite is a separate draw call and the per-call overhead is FAR higher
+    // than on desktop Chromium. A level is ~120 cells wide → ~545 tiles/props/pickups drawn every
+    // frame, almost all off-camera — which pinned an iPhone 17 at ~11fps while desktop stayed
+    // smooth. Hiding everything well outside the view means WebKit only draws what's visible.
+    // `hidden` skips rendering ONLY — colliders/bodies and the enemy AI keep running — and the
+    // generous margin un-hides objects long before they scroll on (no pop-in). Centre on the
+    // player (the camera tracks her within a small lookahead, far less than the margin).
+    const cullables = ["solid", "scenery", "decor", "hazard", "collectible", "powerup", "feather", "heart", "enemy"]
+      .flatMap((t) => k.get(t));
+    const CULL_MARGIN = GAME_W * 0.75; // ~¾ screen of lead each side beyond the view
+    k.onUpdate(() => {
+      const cx = player.pos.x;
+      for (let i = 0; i < cullables.length; i++) {
+        const o = cullables[i];
+        o.hidden = Math.abs(o.pos.x - cx) > CULL_MARGIN;
+      }
+    });
+
     // --- Failure flow (no silent respawn — every failure accrues a debt) ---
     // Touching a lethal obstacle or falling off the world freezes the heroine and shows a
     // DOM "Insert Coin" overlay; inserting 500 Coccoline restarts THIS level from the start

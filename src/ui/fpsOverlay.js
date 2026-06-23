@@ -19,23 +19,26 @@
 
 import { k, maxFPS } from "../kaplayCtx.js";
 
-// Count live game objects (recursively) — a cheap proxy for per-scene draw-call load, to tell a
-// GPU-bound level (many objects) apart from a pacing problem. Walked only on the 250ms render
-// tick below, so the cost is negligible.
+// Count live game objects (recursively) — total vs actually DRAWN (not hidden). The gap is the
+// off-screen culling at work (src/scenes/game.js): on iOS WebKit draw-call count is the fluidity
+// bottleneck, so "drawn" is the number that matters. Walked only on the 250ms render tick below.
 function countObjects() {
-  let n = 0;
-  const walk = (o) => {
+  let total = 0;
+  let drawn = 0;
+  const walk = (o, hiddenAbove) => {
     for (const c of o.children || []) {
-      n++;
-      walk(c);
+      total++;
+      const hidden = hiddenAbove || !!c.hidden;
+      if (!hidden) drawn++;
+      walk(c, hidden);
     }
   };
   try {
-    walk(k.getTreeRoot());
+    walk(k.getTreeRoot(), false);
   } catch {
     // engine/scene not ready yet
   }
-  return n;
+  return total + " (" + drawn + " drawn)";
 }
 
 /** True when the page was opened with ?fps (any value) or #fps. */
