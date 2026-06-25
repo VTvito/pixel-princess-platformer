@@ -71,7 +71,12 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
 - **Pixel UI font:** the Kaplay default font is `"pixel"` (`src/kaplayCtx.js`, loaded in
   `src/assets.js`, mirrored via `@font-face` in `style.css`). It has **no emoji/★ glyphs**, so a
   `k.text()` containing 👑 🍎 ✨ ★ must pass `font: "sans-serif"` per object (DOM falls back
-  per-glyph on its own). The HUD name/level sit at x=88 to clear the top-left ⏸ pause button.
+  per-glyph on its own). The HUD name/level **and the 🍎/★/♥ counters below them** sit at x=88,
+  a single left column that clears the top-left ⏸ pause button. **Keep the counters on the left:**
+  they used to be top-right anchored, but the right corner holds the DOM audio toggles (🎵/🔊,
+  `position:fixed`, always painted **above** the canvas regardless of `z`), and with letterboxing
+  the music button overhangs the canvas edge and covers a right-anchored counter — moving them into
+  the proven left column (same trick as the name) sidesteps the canvas↔DOM coordinate mismatch.
   **Long-form prose also overrides to `font: "sans-serif"`** — the pixel font is hard to read for
   running text at small sizes, so the finale letter (`src/scenes/finale.js`) and the menu character
   descriptions (`src/scenes/menu.js`) use sans-serif; short labels (name/tagline/buttons) stay pixel.

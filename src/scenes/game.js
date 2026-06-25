@@ -427,11 +427,15 @@ export function registerGameScene() {
       k.fixed(),
       k.z(50),
     ]);
+    // I tre counter (🍎/★/♥) vivono nella colonna sinistra a x=88, impilati sotto nome+livello:
+    // lo stesso schema del nome (scavalcare i pulsanti DOM degli angoli). A destra c'erano i
+    // pulsanti audio (🎵/🔊, DOM position:fixed, sempre sopra il canvas): right-anchored qui i
+    // counter finivano coperti. Spostandoli a sinistra (dove c'è solo l'angolo del pulsante pausa,
+    // già scavalcato da x=88) la sovrapposizione sparisce a prescindere dalle bande di letterbox.
     const itemLabel = k.add([
       // sans-serif: the label leads with the theme's collectible emoji, which the pixel font lacks.
       k.text(`${icon} 0/${collectiblesTotal}`, { size: 26, font: "sans-serif" }),
-      k.pos(GAME_W - 24, 18),
-      k.anchor("topright"),
+      k.pos(88, 84),
       k.color(...PALETTE.gold),
       k.fixed(),
       k.z(50),
@@ -440,8 +444,7 @@ export function registerGameScene() {
     const scoreLabel = k.add([
       // sans-serif: the ★ glyph isn't in the pixel font.
       k.text(`★ ${getScore()}`, { size: 22, font: "sans-serif" }),
-      k.pos(GAME_W - 24, 54),
-      k.anchor("topright"),
+      k.pos(88, 116),
       k.color(...hudColor),
       k.fixed(),
       k.z(50),
@@ -450,12 +453,11 @@ export function registerGameScene() {
       addScore(amount);
       scoreLabel.text = `★ ${getScore()}`;
     };
-    // Lives (arcade): a compact heart count, top-right under the score. ♥ isn't in the pixel
+    // Lives (arcade): a compact heart count, under the score. ♥ isn't in the pixel
     // font → sans-serif. Updated on a heart pickup; a death leaves the scene and re-enters.
     const livesLabel = k.add([
       k.text(`♥ ${getLives()}`, { size: 22, font: "sans-serif" }),
-      k.pos(GAME_W - 24, 88),
-      k.anchor("topright"),
+      k.pos(88, 146),
       k.color(...PALETTE.rose),
       k.fixed(),
       k.z(50),
