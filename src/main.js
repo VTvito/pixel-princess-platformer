@@ -6,6 +6,7 @@ import { loadAssets } from "./assets.js";
 import { bindTouchButtons, getInput } from "./controls.js";
 import { bindAudioToggle } from "./ui/audioToggle.js";
 import { installAudioUnlock } from "./audioUnlock.js";
+import { installViewportResync } from "./viewportResync.js";
 import { bindInstallHint } from "./ui/installHint.js";
 import { bindAudioDebug } from "./ui/audioDebug.js";
 import { bindFpsOverlay } from "./ui/fpsOverlay.js";
@@ -26,6 +27,11 @@ bindAudioToggle();
 // Unlock the WebAudio context on the first real DOM gesture (iOS Safari needs this — see
 // src/audioUnlock.js). Without it, neither music nor SFX ever play on iPhone.
 installAudioUnlock();
+
+// Re-letterbox the canvas when iOS hands the PWA back from the background: on resume in
+// landscape Kaplay sometimes keeps a stale canvas size (only two colour bands show, the menu
+// never loads) and a manual rotation was the only recovery. See src/viewportResync.js.
+installViewportResync();
 
 // "Add to Home" hint on iOS Safari (true fullscreen lives only in the installed PWA).
 bindInstallHint();

@@ -89,6 +89,29 @@ try {
 
   await page.screenshot({ path: SHOT_MENU });
 
+  // --- (4) Resume resync (src/viewportResync.js): the iOS-PWA "two colour bands on resume in
+  // landscape" fix. Emulation can't reproduce WebKit's stale-canvas latch, so this only proves
+  // the resume handlers run cleanly and leave the #game canvas covering the full viewport (no
+  // short canvas / body showing through). The real recovery is verified on a physical iPhone. ---
+  const resume = await page.evaluate(async () => {
+    // Fire every foreground signal the module listens for.
+    window.dispatchEvent(new Event("pageshow"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+    // Let the rAF release + the 300 ms delayed second pass run.
+    await new Promise((r) => setTimeout(r, 420));
+    const c = document.getElementById("game");
+    const r = c.getBoundingClientRect();
+    return {
+      covers: Math.abs(r.width - window.innerWidth) <= 2 && Math.abs(r.height - window.innerHeight) <= 2,
+      inlineLeft: c.style.width || "(cleared)", // should be handed back to the stylesheet
+      rect: { w: Math.round(r.width), h: Math.round(r.height) },
+      vp: { w: window.innerWidth, h: window.innerHeight },
+    };
+  });
+  check("canvas covers viewport after a resume signal", resume.covers, JSON.stringify(resume));
+  check("resync releases the inline size back to CSS", resume.inlineLeft === "(cleared)", `inline=${resume.inlineLeft}`);
+
   // --- (1) Audio unlock on a REAL gesture: a genuine tap fires the window capture listener
   // in src/audioUnlock.js, which resumes k.audioCtx. ---
   await page.touchscreen.tap(466, 215); // centre of the 932×430 viewport — a real touch gesture
