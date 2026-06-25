@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Personalized 2D platformer (Kaplay, no build step). This package.json exists ONLY for the dev-time browser test harness; the game itself loads vendored Kaplay and needs no install/build.",
   "license": "MIT",
-  "author": "Vito Delia",
+  "author": "Vito D'Elia",
   "homepage": "https://gameforprincess.vercel.app",
   "repository": {
     "type": "git",
