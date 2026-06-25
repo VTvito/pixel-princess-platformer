@@ -9,7 +9,7 @@
 // Updating: bump CACHE on a meaningful content change. The byte change to this file makes the
 // browser install the new worker, which (skipWaiting + clients.claim) activates immediately
 // and the activate handler deletes the old cache, so the new content is fetched fresh.
-const CACHE = "pj-v12";
+const CACHE = "pj-v13";
 
 // The shell that must be available even if the first visit was interrupted. Everything else
 // (src modules, assets, fonts, vendored Kaplay) is cached lazily on first fetch below.
