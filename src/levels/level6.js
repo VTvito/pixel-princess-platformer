@@ -2,12 +2,13 @@
 // Pure DATA: a tile map + a colour theme; the generic builder (build.js) renders it.
 // Level identity: PENDULUM chandeliers swinging over the hall (timed crossings), ghost
 // SWOOPERS between the columns, a gliding platform over the cellar pit, and the grand
-// staircase up to the ballroom doors. The hardest chapter. Legend: see build.js.
+// staircase up to the ballroom doors. The hardest chapter — so it also grants the run's last
+// heart (+1 vita) on the approach. Legend: see build.js.
 //
 // Arc: intro (the entrance hall, a bat overhead) → develop (the first chandelier, then
 // the cellar-pit crossing) → twist (the chandelier gauntlet + a crumbling minstrel
 // ledge) → climax (the grand staircase and the FINAL BOSS, the "Custode di Pietra" — a
-// 3-hp multi-phase stone guardian that GATES the ballroom doors: dodge its shockwaves and
+// 2-hp multi-phase stone guardian that GATES the ballroom doors: dodge its shockwaves and
 // falling debris, then stomp it during its vulnerable window. See build.js makeBoss).
 
 import { composeMap, arcCollectibles, laneFor, airFor } from "./mapkit.js";
@@ -140,8 +141,12 @@ export const LEVEL_6 = {
       // out for the hardest timing gate (pendulum 2 + the armored ghost), but its window is
       // short (POWERUP.DURATION 5s) so it's a breather, not a "win button".
       { x: 74, y: LANE, ch: "*" },
-      // (No heart here anymore — only Livelli 3 e 5 grant a +1 vita now. The castle is the
-      // hardest chapter and ends in the boss fight, so it's faced with whatever lives remain.)
+      // Arcade: the castle's single heart (+1 vita), on the flat lane just after the x90
+      // checkpoint and before the grand-staircase boss climax — one extra life to face the
+      // Custode with, since this is the hardest chapter and ends in a fight. Clear of the
+      // spike racks (x96/x101) and the staircase, grabbed on the run-up. (Livelli 3 e 5
+      // grant the other +1s; heartsTaken makes it a once-per-run pickup — see state.js.)
+      { x: 92, y: LANE - 1, ch: "H" },
       ...arcCollectibles([6, 15, 26, 38, 44, 54, 68, 76, 86, 94], [AIR, LANE - 1]),
       // Goblets up the staircase.
       { x: 105, y: 9, ch: "o" },

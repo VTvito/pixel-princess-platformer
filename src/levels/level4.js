@@ -124,7 +124,7 @@ export const LEVEL_4 = {
       { x: 40, y: LANE, ch: "^" }, // post-terrace flat, clear of the x44 stalattite column
       { x: 92, y: LANE, ch: "^" },
       // (No star before the ridge anymore — the stalactite timing and the roller bite now.)
-      // (No heart here anymore — only Livelli 3 e 5 grant a +1 vita now; the icy climb is meant
+      // (No heart here anymore — only Livelli 3, 5 e 6 grant a +1 vita now; the icy climb is meant
       // to be survived on timing, not refunded with a banked life.)
       ...arcCollectibles([6, 12, 20, 42, 50, 56, 78, 88, 102], [AIR, LANE - 1]),
       // The crystal hoard on the secret shelf.

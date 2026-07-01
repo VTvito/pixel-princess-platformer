@@ -113,7 +113,7 @@ export const LEVEL_1 = {
       { x: 98, y: 10, ch: "^" }, // on the first terrace's surface
       // (No invincibility stars in the tutorial anymore — arcade difficulty: the develop
       // crabs/thorns and the airborne twist must be read and timed, not bulldozed.)
-      // (No heart here anymore — only Livelli 3 e 5 grant a +1 vita now, so lives are scarcer
+      // (No heart here anymore — only Livelli 3, 5 e 6 grant a +1 vita now, so lives are scarcer
       // across a run; the early levels lean on careful play instead of a banked extra life.)
       // Apples along the run (rows 9–10, grabbed mid-jump).
       ...arcCollectibles([8, 16, 23, 32, 44, 64, 86], [AIR, LANE - 1]),

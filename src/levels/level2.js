@@ -121,7 +121,7 @@ export const LEVEL_2 = {
       { x: 94, y: LANE, ch: "c" }, // a fresh guard on the post-updraft flat (banked at x84)
       { x: 100, y: LANE, ch: "c" },
       // (No mid-level star anymore — the twist's crab + urchin pressure now bites for real.)
-      // (No heart here anymore — only Livelli 3 e 5 grant a +1 vita now, so a run's lives are
+      // (No heart here anymore — only Livelli 3, 5 e 6 grant a +1 vita now, so a run's lives are
       // scarcer; the coral's crab + urchin pressure must be read, not bought back with a banked life.)
       ...arcCollectibles([8, 16, 21, 32, 44, 50, 58, 66, 78, 86, 96, 102, 110], [AIR, LANE - 1]),
       // Crumble ledge: a quick risky hop over the twist stretch pays out two pearls.

@@ -7,10 +7,10 @@
 //   • it runs its deterministic phase loop into a VULNERABLE WINDOW (invulnerable → false) at a
 //     lower, stompable height, and back out — so the fight always comes back around;
 //   • it actually FIRES attacks (transient "boss-attack" hazards appear);
-//   • a stomp during the window DAMAGES it (hp 3 → 2) — i.e. it's beatable with jump+stomp;
+//   • a stomp during the window DAMAGES it (hp 2 → 1) — i.e. it's beatable with jump+stomp;
 //   • it GATES the goal: with the boss alive the ballroom doors stay sealed; once it's gone the
 //     goal completes and progress advances (Livello 6 → 7).
-// The full 3-stomp kill is verified by hand in-browser; here we prove the mechanic + the gate.
+// The full 2-stomp kill is verified by hand in-browser; here we prove the mechanic + the gate.
 //
 // Usage:  python tools/serve.py 8137   (then)   node tools/test/boss.mjs
 // Exit code 0 = all pass, 1 = a failure or a console error.
@@ -72,7 +72,7 @@ try {
     };
   });
   check("boss spawns on Livello 6", spawn.count === 1, `count=${spawn.count}`);
-  check("boss starts at full hp + invulnerable", spawn.hp === 3 && spawn.invulnerable === true, JSON.stringify(spawn));
+  check("boss starts at full hp + invulnerable", spawn.hp === 2 && spawn.invulnerable === true, JSON.stringify(spawn));
   check("Livello 6 still has its goal", spawn.goals > 0, `goals=${spawn.goals}`);
 
   // --- Gate CLOSED: with the boss alive the goal is sealed. Park the boss (pause its AI + clear
@@ -140,7 +140,7 @@ try {
 
   await page.screenshot({ path: SHOT });
 
-  // --- A stomp during the window DAMAGES the boss (hp 3 → 2): wait for the window, clear any
+  // --- A stomp during the window DAMAGES the boss (hp 2 → 1): wait for the window, clear any
   // in-flight attack, drop onto the boss from above. Proves it's beatable with jump+stomp. ---
   const damage = await page.evaluate(async () => {
     const k = window.__pj.k;

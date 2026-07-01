@@ -119,9 +119,10 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   so it never caches stale files between Playwright runs / dev edits. On a real content change,
   bump `CACHE` in `sw.js` so clients fetch fresh. It now also **bypasses `/api/*`** (never caches
   the live leaderboard).
-- **Arcade lives = a "partita":** start `LIVES.START` (3) lives, +1 per `H` heart (only on
-  **Livelli 3 & 5** now — the other levels' hearts were removed so lives stay scarce across a
-  run; don't re-add them without a reason), capped `LIVES.MAX`. A death spends a life **and** banks 500 Coccoline, respawning from the
+- **Arcade lives = a "partita":** start `LIVES.START` (3) lives, +1 per `H` heart (on
+  **Livelli 3, 5 & 6** — the other levels' hearts were removed so lives stay scarce across a
+  run; don't re-add them without a reason. L6's heart is the exception's exception: the castle is
+  the hardest chapter and ends in the boss fight, so it grants one extra life on the run-up), capped `LIVES.MAX`. A death spends a life **and** banks 500 Coccoline, respawning from the
   checkpoint; at 0 lives `die()` calls `resetRun()` (level→1, score→0, lives refilled, checkpoint
   cleared) and shows the **Game Over** overlay (`src/ui/gameOver.js`). `resetRun()` deliberately
   **keeps** `coccolineRun` + `totaleCoccoline` so the finale tallies every Coccolina across

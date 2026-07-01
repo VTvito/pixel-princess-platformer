@@ -438,8 +438,8 @@ try {
 
   // --- Fase Arcade: hearts grant a life, and losing them all triggers Game Over (back to
   // level 1, score wiped, Coccoline tab KEPT). Run last, so the earlier finale-receipt
-  // assertion still sees only the single 500 from the §1 death. Hearts now live ONLY on
-  // Livelli 3 & 5 (the others were removed to make lives scarcer), so probe the heart on
+  // assertion still sees only the single 500 from the §1 death. Hearts now live only on
+  // Livelli 3, 5 & 6 (the others were removed to make lives scarcer), so probe the heart on
   // Livello 3; Game Over still resets the run to Livello 1 regardless of where it happened. ---
   await page.evaluate(() => {
     localStorage.setItem("pj.currentLevel", "3");
