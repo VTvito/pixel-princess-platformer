@@ -71,6 +71,22 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   meshes them into a few big static bodies (culling alone didn't help here: it skips drawing, not
   collision). Net: same look + hitboxes, ~10× fewer draws and bodies. **Never re-add a per-tile
   `area()`/`body()` to `=` tiles** — it reintroduces the collision-cost regression.
+- **Frame-cap is per-STATE, mutated at runtime (thermal, not fluidity):** even at a steady
+  60fps the game kept **redrawing 60×/s while nothing moved** — sitting on the menu, paused
+  behind a DOM overlay, on the reward/finale screens — which cooked the iPhone GPU for no
+  gameplay. Fix: `setFrameCap(cap)` (`src/kaplayCtx.js`) re-caps the loop **live** by mutating
+  the very options object Kaplay reads each frame (the loop does `gopt.maxFPS ? 1/gopt.maxFPS
+  : 0` — it never clones it, so the options MUST stay a named `gameOpts` const, NOT an inline
+  literal). Each scene/state re-asserts its cap on entry, so no global state to leak: **active
+  play → `maxFPS`** (60 mobile / uncapped desktop — the feel is untouched), **menu / finale /
+  loading / reward overlay → `PERF.IDLE_FPS` (30)**, **pause + Insert-Coin/Game-Over (world
+  frozen) → `PERF.FROZEN_FPS` (10)**. It changes only the render rate, never the fixed physics
+  dt, so throttling an idle scene can't alter behaviour. `PERF` lives in `src/config.js`; the
+  `?maxfps=N` override still wins for active play (idle/frozen stay fixed). **This is deliberately
+  NOT a 60→30 cut during real play** — a platformer at 30 feels worse, so in-play stays full;
+  the win is purely the standing-still states. Confirm on a real iPhone with `?fps=1` (menu ~30,
+  in-level 60, paused ~10). Also **mobile trims momentary overdraw**: confetti bursts 8 (vs 14)
+  and slightly fewer ambient particles under `coarsePointer` — invisible, shaves peak fill.
 - **Emulation ≠ device:** Edge/Chromium can't reproduce WebKit audio quirks or the notch
   safe-area — real iOS audio/safe-area must be verified on a physical iPhone.
 - **Dev handle:** `window.__pj` (engine + live virtual `input`) is attached **only on localhost**

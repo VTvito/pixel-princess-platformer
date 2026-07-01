@@ -3,7 +3,7 @@
 // hit-stop. (Squash & stretch lives in the player entity; parallax lives in the game
 // scene, both tightly coupled to those files.)
 
-import { k } from "./kaplayCtx.js";
+import { k, coarsePointer } from "./kaplayCtx.js";
 
 /**
  * Burst of confetti at a world position: small coloured rectangles that fly outward, fall
@@ -12,7 +12,10 @@ import { k } from "./kaplayCtx.js";
  * @param {number[][]} colors        RGB triples to pick from
  */
 export function confettiBurst(pos, colors = [[212, 175, 55], [255, 255, 255], [231, 150, 173]]) {
-  const COUNT = 14;
+  // Fewer confetti on mobile (8 vs 14): each is a live alpha-blended particle with its own
+  // per-frame update, and a burst can fire mid-run (pickups) right when the GPU is busiest.
+  // The reduction is momentary and imperceptible, but shaves the peak fill/CPU on iOS.
+  const COUNT = coarsePointer ? 8 : 14;
   for (let i = 0; i < COUNT; i++) {
     const col = colors[i % colors.length] || [255, 255, 255];
     const ang = k.rand(0, Math.PI * 2);

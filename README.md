@@ -36,9 +36,11 @@ physics, assets). DOM/HTML UI (`src/ui/`) is isolated from the gameplay/collisio
 (`src/scenes/game.js`). Deployed on **Vercel**; browser tests run in real Edge via
 `playwright-core` (the only dev dependency).
 
-Performance work that makes it smooth on a real iPhone: `pixelDensity: 1` on touch devices,
-off-screen culling of draws, and greedy-meshed solid colliders — see [`CLAUDE.md`](CLAUDE.md) for
-the engineering notes and gotchas.
+Performance work that makes it smooth — and cool — on a real iPhone: `pixelDensity: 1` on touch
+devices, off-screen culling of draws, greedy-meshed solid colliders, and a per-state frame cap that
+drops the render rate when nothing is moving (menus/pause/reward) so the GPU stops cooking the phone
+while play itself stays at full 60fps — see [`CLAUDE.md`](CLAUDE.md) for the engineering notes and
+gotchas.
 
 ## Run it locally
 

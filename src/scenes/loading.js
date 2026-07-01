@@ -2,13 +2,14 @@
 // Assets start loading in main.js before this scene runs; k.onLoad fires once they are
 // all ready, then we hand off to the menu.
 
-import { k } from "../kaplayCtx.js";
-import { GAME_W, GAME_H, PALETTE } from "../config.js";
+import { k, setFrameCap } from "../kaplayCtx.js";
+import { GAME_W, GAME_H, PALETTE, PERF } from "../config.js";
 
 export function registerLoadingScene() {
   k.scene("loading", () => {
     // Touch controls belong to gameplay only — keep them hidden on the loading screen.
     document.body.classList.remove("playing");
+    setFrameCap(PERF.IDLE_FPS); // just a title + a pulsing dot — no need to render it at full rate
 
     k.add([k.rect(GAME_W, GAME_H), k.pos(0, 0), k.color(...PALETTE.deepBlue)]);
 

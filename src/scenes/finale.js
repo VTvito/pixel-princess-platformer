@@ -4,8 +4,8 @@
 // centred box showing a personalized message (edit FINALE in config.js). A single button
 // (or Enter/Esc) returns to the menu.
 
-import { k } from "../kaplayCtx.js";
-import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE } from "../config.js";
+import { k, setFrameCap } from "../kaplayCtx.js";
+import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE, PERF } from "../config.js";
 import { getSelectedCharacter, getCoccoline, getCoccolineRun, getScore } from "../state.js";
 import { addSkinLayers, syncSkins } from "../entities/player.js";
 import { resetInput } from "../controls.js";
@@ -36,6 +36,7 @@ export function registerFinaleScene() {
     hidePause();
     hideSettings();
     resetHitStop(); // arrive at full speed even if a stomp's hit-stop was cut short by the goal
+    setFrameCap(PERF.IDLE_FPS); // a cinematic still with a bobbing avatar — 30fps is cool and ample
     // Cinematic scene — no controls; keep the gameplay touch buttons hidden.
     document.body.classList.remove("playing");
 

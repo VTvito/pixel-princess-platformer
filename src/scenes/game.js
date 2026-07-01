@@ -4,7 +4,7 @@
 // on reaching the goal runs the reward flow: unlock a skin, advance progress, continue to
 // the next level with the new skin layered on.
 
-import { k, coarsePointer } from "../kaplayCtx.js";
+import { k, coarsePointer, maxFPS, setFrameCap } from "../kaplayCtx.js";
 import {
   GAME_W,
   GAME_H,
@@ -15,6 +15,7 @@ import {
   MECHANICS,
   SCORE,
   POWERUP,
+  PERF,
   MAX_LEVEL,
   unlockedSkinKeys,
   skinUnlockedBy,
@@ -88,6 +89,8 @@ export function registerGameScene() {
     hideSettings();
     k.getTreeRoot().paused = false;
     resetHitStop(); // a hit-stop interrupted by the restart must never leak a 0.15× timeScale here
+    setFrameCap(maxFPS); // active play runs at the full rate (60 mobile / uncapped desktop); a
+    // previous menu/pause/reward may have throttled it — restore it the instant a level starts.
     // Reveal the on-screen touch controls (CSS shows them only while body.playing).
     document.body.classList.add("playing");
 
@@ -192,6 +195,7 @@ export function registerGameScene() {
       dead = true;
       player.setAnim("hurt"); // the "ops" face — set before pausing freezes updates
       player.paused = true; // freeze the heroine behind the overlay
+      setFrameCap(PERF.FROZEN_FPS); // world is stopped behind the Insert-Coin / Game Over overlay
       sfx("oops"); // gentle "you slipped" cue (no harsh game-over)
       resetInput();
       addCoccoline(500); // the bill is sacred — every slip costs 500, banked immediately
@@ -620,6 +624,9 @@ export function registerGameScene() {
     const setFrozen = (on) => {
       paused = on;
       k.getTreeRoot().paused = on;
+      // Nothing moves behind the pause overlay, so drop the render rate hard while frozen and
+      // restore the full play rate on resume (the single pause chokepoint).
+      setFrameCap(on ? PERF.FROZEN_FPS : maxFPS);
     };
     function pauseGame() {
       if (finished || dead || paused) return;
@@ -718,7 +725,7 @@ function drawParallax(decor) {
 // Drifting bubbles for the underwater level (extracted from the old drawCoral; the coral
 // fronds now live in the coral_mid/near parallax images).
 function drawBubbles() {
-  const N = coarsePointer ? 9 : 14; // lighter ambient load on mobile (near-identical look)
+  const N = coarsePointer ? 7 : 14; // lighter ambient load on mobile (near-identical look)
   for (let i = 0; i < N; i++) {
     const bx = k.rand(0, GAME_W);
     const speed = k.rand(12, 30);
@@ -743,7 +750,7 @@ function drawBubbles() {
 // signature ambient motion.
 function drawMotes(theme) {
   const tint = theme.mote || [255, 198, 120];
-  const N = coarsePointer ? 10 : 18; // lighter ambient load on mobile (near-identical look)
+  const N = coarsePointer ? 8 : 18; // lighter ambient load on mobile (near-identical look)
   for (let i = 0; i < N; i++) {
     const rise = k.rand(10, 26);
     const swayAmp = k.rand(6, 16);
@@ -775,7 +782,7 @@ function drawMotes(theme) {
 // Falling snow for the alpine level (extracted from the old drawSnow; the peaks now live in
 // the snow_mid/near parallax images).
 function drawSnowflakes() {
-  const N = coarsePointer ? 24 : 40; // lighter ambient load on mobile (near-identical look)
+  const N = coarsePointer ? 18 : 40; // lighter ambient load on mobile (near-identical look)
   for (let i = 0; i < N; i++) {
     const speed = k.rand(22, 56);
     const drift = k.rand(-14, 14);
@@ -800,6 +807,9 @@ function drawSnowflakes() {
 
 // --- Reward overlay: announce the unlocked skin, then continue to the next level ---
 function showReward(reward, got, total, icon, nextLevel) {
+  // Level cleared → the world is done; only a gently bobbing hero animates. 30fps is plenty
+  // (the next scene, game or finale, re-asserts its own cap on entry).
+  setFrameCap(PERF.IDLE_FPS);
   k.add([
     k.rect(GAME_W, GAME_H),
     k.pos(0, 0),

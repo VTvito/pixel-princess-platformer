@@ -2,8 +2,8 @@
 // Flow: title screen with a Start button -> three character cards -> pick one ->
 // start music (this is the user gesture that unlocks audio on iOS Safari) -> game.
 
-import { k } from "../kaplayCtx.js";
-import { GAME_W, GAME_H, PALETTE, CHARACTERS, MAX_LEVEL, FINALE } from "../config.js";
+import { k, setFrameCap } from "../kaplayCtx.js";
+import { GAME_W, GAME_H, PALETTE, CHARACTERS, MAX_LEVEL, FINALE, PERF } from "../config.js";
 import {
   setSelectedCharacter,
   getSelectedCharacter,
@@ -65,6 +65,7 @@ export function registerMenuScene() {
     hidePause();
     hideSettings();
     resetHitStop(); // never inherit a frozen 0.15× timeScale from a hit-stop cut short by leaving game
+    setFrameCap(PERF.IDLE_FPS); // the menu only drifts a backdrop — 30fps runs cool while she picks
     // Hide the gameplay touch controls so they never cover the menu's character cards.
     document.body.classList.remove("playing");
 

@@ -45,7 +45,15 @@ function resolveMaxFPS() {
 }
 export const maxFPS = resolveMaxFPS();
 
-export const k = kaplay({
+// The options are kept in a NAMED object (not an inline literal) because the Kaplay frame
+// loop reads `gopt.maxFPS` LIVE every step (`Rt = gopt.maxFPS ? 1/gopt.maxFPS : 0`) off the
+// very object we pass in — it never clones or buffers it. So mutating `gameOpts.maxFPS` here
+// re-caps the loop from the next frame, no engine re-init needed. `setFrameCap` below uses
+// that to throttle the render when nothing is happening (menu/pause/premio) — see the
+// per-state caps wired in the scenes. This is the load-bearing trick for the "run cooler
+// while idle" work: the game's ACTIVE 60fps feel is untouched; only the standing-still states
+// drop their frame rate so an iPhone's GPU stops cooking behind a static overlay.
+const gameOpts = {
   width: GAME_W,
   height: GAME_H,
   // letterbox + stretch: scale to the viewport while keeping the 16:9 landscape aspect
@@ -71,4 +79,18 @@ export const k = kaplay({
   // font:"sans-serif" per object. Until the async load finishes (the loading scene), Kaplay
   // falls back to its built-in font for the brief "Caricamento..." text.
   font: "pixel",
-});
+};
+
+export const k = kaplay(gameOpts);
+
+// Re-cap the render loop AT RUNTIME by mutating the live options object Kaplay reads each
+// frame (see the gameOpts note above). Scenes call this to run cooler when the game is just
+// sitting there: 30fps on menus/finale/loading/reward, ~10 behind the pause + death overlays,
+// and back to the full `maxFPS` (60 mobile / uncapped desktop) the instant real play resumes.
+//   cap falsy or <= 0 → uncapped   |   cap > 0 → lock the loop to `cap` fps
+// It changes ONLY the frame rate, never gameplay dt/physics (Kaplay steps a fixed dt), so
+// throttling an idle scene can't alter behaviour — it just draws fewer frames of a scene that
+// isn't moving anyway.
+export function setFrameCap(cap) {
+  gameOpts.maxFPS = cap && cap > 0 ? cap : undefined;
+}

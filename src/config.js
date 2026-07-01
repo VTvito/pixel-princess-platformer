@@ -182,6 +182,18 @@ export const CAMERA = {
   EASE: 4,       // easing rate (1 - exp(-dt * EASE) per frame)
 };
 
+// Frame-cap per game state (thermal, not fluidity). ACTIVE play keeps its full rate
+// (`maxFPS`: 60 mobile / uncapped desktop — untouched, the feel is sacred). But when the game
+// is just STANDING there — menu, finale, loading, the end-of-level reward — 30fps is plenty
+// for a drifting backdrop, and behind a FROZEN world (pause / Insert-Coin / Game Over overlays)
+// even ~10fps looks identical since nothing moves. Dropping the render rate in those states
+// stops an iPhone's GPU from redrawing a static scene 60×/s and cooking the phone for no
+// reason. Wired via setFrameCap (src/kaplayCtx.js) at each scene/state entry. See CLAUDE.md.
+export const PERF = {
+  IDLE_FPS: 30,   // animated-but-not-played states (menu / finale / loading / reward overlay)
+  FROZEN_FPS: 10, // world frozen behind a DOM overlay (pause / death) — nothing is moving
+};
+
 // Points (spec: Mario-style scoring). A collected pickup and a stomped enemy each add to the
 // running journey score (src/state.js), shown in the HUD and the end-of-level reward.
 export const SCORE = {
