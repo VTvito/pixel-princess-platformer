@@ -7,10 +7,11 @@
 //   • it runs its deterministic phase loop into a VULNERABLE WINDOW (invulnerable → false) at a
 //     lower, stompable height, and back out — so the fight always comes back around;
 //   • it actually FIRES attacks (transient "boss-attack" hazards appear);
-//   • a stomp during the window DAMAGES it (hp 2 → 1) — i.e. it's beatable with jump+stomp;
-//   • it GATES the goal: with the boss alive the ballroom doors stay sealed; once it's gone the
+//   • a stomp during the window DAMAGES it (hp 3 → 2) — i.e. it's beatable with jump+stomp;
+//   • felling it (3 stomps) DROPS the ballroom KEY, and the goal is GATED until the boss is down
+//     AND the key is taken: with the boss alive the doors stay sealed; once it's felled + keyed the
 //     goal completes and progress advances (Livello 6 → 7).
-// The full 2-stomp kill is verified by hand in-browser; here we prove the mechanic + the gate.
+// The whole fight is driven headlessly below (spawn, window, stomp, fell → key → gate → advance).
 //
 // Usage:  python tools/serve.py 8137   (then)   node tools/test/boss.mjs
 // Exit code 0 = all pass, 1 = a failure or a console error.
@@ -72,7 +73,7 @@ try {
     };
   });
   check("boss spawns on Livello 6", spawn.count === 1, `count=${spawn.count}`);
-  check("boss starts at full hp + invulnerable", spawn.hp === 2 && spawn.invulnerable === true, JSON.stringify(spawn));
+  check("boss starts at full hp + invulnerable", spawn.hp === 3 && spawn.invulnerable === true, JSON.stringify(spawn));
   check("Livello 6 still has its goal", spawn.goals > 0, `goals=${spawn.goals}`);
 
   // --- Gate CLOSED: with the boss alive the goal is sealed. Park the boss (pause its AI + clear
@@ -140,7 +141,7 @@ try {
 
   await page.screenshot({ path: SHOT });
 
-  // --- A stomp during the window DAMAGES the boss (hp 2 → 1): wait for the window, clear any
+  // --- A stomp during the window DAMAGES the boss (hp 3 → 2): wait for the window, clear any
   // in-flight attack, drop onto the boss from above. Proves it's beatable with jump+stomp. ---
   const damage = await page.evaluate(async () => {
     const k = window.__pj.k;
@@ -163,24 +164,65 @@ try {
   check("a stomp wounds the boss (hp −1)", damage.ok, damage.why || `hp ${damage.hp}`);
   check("the wounded boss retreats (re-invulnerable)", damage.retreated === true, JSON.stringify(damage));
 
-  // --- Gate OPEN: once the boss is gone the doors unseal — destroy it (a stand-in for the final
-  // stomp), teleport the heroine into the goal, and progress must advance (Livello 6 → 7). ---
-  const gateOpen = await page.evaluate(async () => {
+  // --- Fell it → it DROPS the key → the key opens the gate. Set hp=1 for a quick, deterministic
+  // final blow, stomp it dead during a window (which spawns the key), let the heroine drop back
+  // onto the arena and grab it, then walk into the goal: progress must advance (Livello 6 → 7).
+  // `keysMax` samples the key's presence so we still register it even if she grabs it fast. ---
+  const finish = await page.evaluate(async () => {
     const k = window.__pj.k;
-    k.get("boss").forEach((b) => k.destroy(b)); // as if felled
-    k.get("boss-attack").forEach((h) => k.destroy(h));
-    const g = k.get("goal")[0];
+    const boss0 = k.get("boss")[0];
+    if (boss0) boss0.hp = 1; // one stomp from felling — keeps the probe quick + deterministic
     const p = k.get("player")[0];
-    p.pos.x = g.pos.x - 300; p.pos.y = g.pos.y; p.vel.y = 0; // exit any prior overlap
-    await new Promise((r) => setTimeout(r, 120));
-    p.pos.x = g.pos.x; p.pos.y = g.pos.y; p.vel.y = 0; // into the beam → reward flow
+    let keysMax = 0;
+    // Fell it: while the boss winds up, park her far away (x=160) and keep the arena clear so its
+    // shockwaves/debris can't kill her (a death would freeze her behind Insert-Coin and she could
+    // never stomp). When a window opens, drop onto it ONCE and let her fall + land the stomp (don't
+    // re-yank her up every tick, or she never descends far enough to connect). Repeat per window.
     const t0 = Date.now();
-    while (Date.now() - t0 < 3000 && localStorage.getItem("pj.currentLevel") !== "7") {
+    while (Date.now() - t0 < 16000 && k.get("boss").length > 0) {
+      const b = k.get("boss")[0];
+      k.get("boss-attack").forEach((h) => k.destroy(h)); // keep the arena clear
+      if (b && !b.invulnerable) {
+        p.pos.x = b.pos.x; p.pos.y = b.pos.y - 80; p.vel.y = 240; // fall onto it → stomp branch
+        for (let i = 0; i < 10 && k.get("boss").length > 0; i++) {
+          k.get("boss-attack").forEach((h) => k.destroy(h));
+          keysMax = Math.max(keysMax, k.get("key").length);
+          await new Promise((r) => setTimeout(r, 40)); // let the stomp connect before re-checking
+        }
+      } else {
+        p.pos.x = 160; p.pos.y = 200; p.vel.y = 0; // safe far-left park while it telegraphs/attacks
+        keysMax = Math.max(keysMax, k.get("key").length);
+        await new Promise((r) => setTimeout(r, 40));
+      }
+    }
+    const felled = k.get("boss").length === 0;
+    // Let her drop back onto the flat arena floor and pick up the dropped key (sample throughout,
+    // clearing any lingering hazards so she can collect it in peace).
+    for (let i = 0; i < 20; i++) {
+      k.get("boss-attack").forEach((h) => k.destroy(h));
+      keysMax = Math.max(keysMax, k.get("key").length);
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    // Belt-and-suspenders: if a key still rests there, walk the heroine onto it to grab it.
+    const key = k.get("key")[0];
+    if (key) {
+      p.pos.x = key.pos.x; p.pos.y = key.pos.y; p.vel.y = 0;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    // Into the goal beam → reward flow → progress advances.
+    const g = k.get("goal")[0];
+    p.pos.x = g.pos.x - 200; p.pos.y = g.pos.y; p.vel.y = 0; // exit any prior overlap, clear of the key
+    await new Promise((r) => setTimeout(r, 120));
+    p.pos.x = g.pos.x; p.pos.y = g.pos.y; p.vel.y = 0;
+    const t1 = Date.now();
+    while (Date.now() - t1 < 3000 && localStorage.getItem("pj.currentLevel") !== "7") {
       await new Promise((r) => setTimeout(r, 60));
     }
-    return localStorage.getItem("pj.currentLevel");
+    return { felled, keysMax, level: localStorage.getItem("pj.currentLevel") };
   });
-  check("goal OPENS once the boss is felled (L6 → 7)", gateOpen === "7", `currentLevel=${gateOpen}`);
+  check("the boss is fellable with stomps", finish.felled, JSON.stringify(finish));
+  check("felling drops the ballroom key", finish.keysMax >= 1, `keysMax=${finish.keysMax}`);
+  check("goal OPENS once the boss is felled + the key is taken (L6 → 7)", finish.level === "7", `currentLevel=${finish.level}`);
 
   // --- The boss is exclusive to Livello 6: no other level spawns one (spot-check L5). ---
   await bootLevel(page, 5);

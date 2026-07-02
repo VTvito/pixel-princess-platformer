@@ -87,6 +87,19 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   the win is purely the standing-still states. Confirm on a real iPhone with `?fps=1` (menu ~30,
   in-level 60, paused ~10). Also **mobile trims momentary overdraw**: confetti bursts 8 (vs 14)
   and slightly fewer ambient particles under `coarsePointer` — invisible, shaves peak fill.
+- **Active-play cap is REFRESH-AWARE (fixes jump judder on 60Hz):** the old fixed 60 cap on every
+  touch device was the wrong call on a **60Hz** panel (many non-Pro iPhones, touch laptops). The
+  loop renders only when `accumulated > 1/maxFPS`; when the cap ≈ the refresh, timing jitter
+  periodically fails that check and **skips a frame** → micro-stutter, worst during a jump's smooth
+  arc (the exact "salti meno fluidi" report). A 60Hz panel is already smooth **uncapped** (and can't
+  exceed 60), so the cap there was pure downside. `measureRefreshAndTuneCap` (`src/kaplayCtx.js`)
+  samples the real refresh at boot (during loading/menu, both throttled to `IDLE_FPS`, so it lands
+  before the first level) and sets the active cap: **≤70Hz → uncapped**, **>70Hz (ProMotion) → cap
+  ≈ half the refresh, nudged up a hair** so the accumulator reliably renders every 2nd frame (the
+  even, tamed 60 that ProMotion needs — the case this note used to defend, preserved). `maxFPS` is
+  now an **`export let`** (live binding) retuned by the probe; scenes read it on entry via
+  `setFrameCap`. `?maxfps=N` still wins outright (no auto-tune). This resolves the old "open
+  question" about the 60-cap on ProMotion: cap only when the refresh actually warrants it.
 - **Emulation ≠ device:** Edge/Chromium can't reproduce WebKit audio quirks or the notch
   safe-area — real iOS audio/safe-area must be verified on a physical iPhone.
 - **Dev handle:** `window.__pj` (engine + live virtual `input`) is attached **only on localhost**
@@ -122,19 +135,38 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   bespoke multi-phase guardian, deliberately **softlock-proof** — keep it that way. It is tagged
   **`"boss"`, NOT `"enemy"`**, so its body is **harmless to touch**: only the transient `"hazard"`
   it spawns (a ground **shockwave** to jump + telegraphed falling **debris**, both also tagged
-  `"boss-attack"`) can hurt her. A dedicated `player.onCollide("boss")` in `game.js` damages it
-  **only on a stomp during its vulnerable window** (`boss.invulnerable === false`); each hit
-  enrages it (`hp`-derived, but the window length is **fixed** so it stays beatable). Its phase
-  loop is **deterministic** (not player-position-driven) so the window always recurs. It **gates
-  the goal**: `onCollide("goal")` early-returns while `k.get("boss").length > 0` — no physical
-  wall (nothing to wedge behind), and the boss is guaranteed killable, so the gate can't deadlock.
-  `makeBoss` derives its hover/window heights from the arena **floor it scans below** (`case "G"`),
-  tuned to the single-jump apex (~148px). Tunables live in `config.BOSS`; coverage in
-  `tools/test/boss.mjs`. (The old optional sneak-past Gargoyle is gone — this replaces it.)
-- **Service worker is prod-only:** `sw.js` is registered in `src/main.js` **only off localhost**,
-  so it never caches stale files between Playwright runs / dev edits. On a real content change,
-  bump `CACHE` in `sw.js` so clients fetch fresh. It now also **bypasses `/api/*`** (never caches
-  the live leaderboard).
+  `"boss-attack"`) can hurt her. A dedicated **`player.onCollideUpdate("boss")`** in `game.js`
+  damages it **only on a stomp during its vulnerable window** (`boss.invulnerable === false`);
+  **`BOSS.HP` is 3** so felling it takes 3 stomps; each hit enrages it (`hp`-derived, but the window
+  length is **fixed** so it stays beatable). **Why `onCollideUpdate`, not `onCollide`:** the boss's
+  tall hitbox during the window sits just below the single-jump apex, so a jump from the floor
+  **enters the hitbox while still rising** — the one-shot `onCollide`-*enter* event fired on the way
+  up (not a stomp), and since her apex never cleared the top to re-separate, no fresh enter fired on
+  the way down, so the stomp was **never registered** (the boss felt impossible to hit). Checking
+  every overlapping frame catches the descent; after a hit the retreat + bounce make the next frame
+  a non-stomp, so it's still **one hit per window**. Its phase loop is **deterministic** (not
+  player-position-driven) so the window always recurs. **Felled, it drops the ballroom KEY**
+  (`spawnKey`, `build.js`) on the flat arena floor; the heroine must grab it. It **gates the goal**:
+  `onCollide("goal")` early-returns while `k.get("boss").length > 0` **or the key isn't taken yet**
+  — no physical wall (nothing to wedge behind), and both the boss and the key are guaranteed
+  reachable, so the gate can't deadlock. `makeBoss` derives its hover/window heights from the arena
+  **floor it scans below** (`case "G"`), tuned to the single-jump apex (~148px), and exposes
+  `boss.floorY` so the scene can rest the key on the floor. Tunables live in `config.BOSS`; coverage
+  in `tools/test/boss.mjs`. (The old optional sneak-past Gargoyle is gone — this replaces it.)
+- **Service worker is prod-only + auto-fresh:** `sw.js` is registered in `src/main.js` **only off
+  localhost**, so it never caches stale files between Playwright runs / dev edits. It **bypasses
+  `/api/*`** (never caches the live leaderboard). Freshness model so an **installed PWA always runs
+  the latest deploy** (no more hand-bumping `CACHE`): the app **code** (navigations + `.js`/`.mjs`/
+  `.css`) is **network-first** (newest when online, cache only offline); heavy **media** (assets/
+  fonts/vendor) is **cache-first**. `tools/deploy.mjs` **auto-stamps a unique id into `CACHE`** right
+  before each deploy (then restores the template) so every deploy ships a byte-different `sw.js` →
+  browser installs the new worker → `skipWaiting`+`clients.claim` activate it → `activate` purges the
+  old cache. `vercel.json` sets `Cache-Control: no-cache` on `/sw.js`, `/`, `/index.html`,
+  `/manifest.webmanifest`, `/src/*` so the HTTP layer revalidates the code. `main.js` calls
+  `reg.update()` on load + on foreground and does a **guarded one-time `location.reload()` on
+  `controllerchange`** (only if a controller already existed at load) so an open session switches to
+  the fresh code near startup. **Don't** revert code fetches to cache-first — installed apps would go
+  stale again.
 - **Arcade lives = a "partita":** start `LIVES.START` (3) lives, +1 per `H` heart (on
   **Livelli 3, 5 & 6** — the other levels' hearts were removed so lives stay scarce across a
   run; don't re-add them without a reason. L6's heart is the exception's exception: the castle is

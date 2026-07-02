@@ -24,26 +24,30 @@ export const coarsePointer =
   (window.matchMedia?.("(pointer: coarse)")?.matches ||
     (typeof navigator !== "undefined" && (navigator.maxTouchPoints || 0) > 0));
 
-// Effective simulation-rate cap. Default: 60 on touch (steady pacing — see the maxFPS note
-// below), uncapped on desktop. A `?maxfps=` URL override lets us A/B the cap ON THE DEVICE,
-// which emulation can't judge — the key open question is whether a 60 cap on a 120Hz iPhone
-// (ProMotion) reads smoother or choppier than free-running:
-//   ?maxfps=0  (or off/invalid) → uncapped   ?maxfps=90 → cap at 90, etc.
-// Exported so the FPS overlay (src/ui/fpsOverlay.js) can report the value actually in force.
-function resolveMaxFPS() {
-  let cap = coarsePointer ? 60 : undefined;
+// Read a `?maxfps=` URL override (for on-device A/B). Returns whether it was EXPLICITLY set (so the
+// auto-tuning below never fights a manual choice) plus the resolved cap.
+//   ?maxfps=0 (or off/invalid) → uncapped   ?maxfps=90 → cap at 90, etc.
+function readMaxFpsOverride() {
   try {
     const p = new URLSearchParams(location.search).get("maxfps");
     if (p !== null) {
       const n = parseInt(p, 10);
-      cap = Number.isFinite(n) && n > 0 ? n : undefined; // 0 / off / NaN → uncapped
+      return { explicit: true, cap: Number.isFinite(n) && n > 0 ? n : undefined };
     }
   } catch {
-    // malformed search — keep the default
+    // malformed search — no override
   }
-  return cap;
+  return { explicit: false, cap: undefined };
 }
-export const maxFPS = resolveMaxFPS();
+const fpsOverride = readMaxFpsOverride();
+
+// Effective simulation-rate cap for ACTIVE play. `export let` (not const) so it's a LIVE binding:
+// the async refresh probe at the bottom can retune it, and every importer (the game scene that
+// re-asserts it on entry, the fps overlay) sees the new value. Default: UNCAPPED, then tuned on
+// touch devices once we've measured the real display refresh — see measureRefreshAndTuneCap for
+// the full rationale (short version: a fixed 60 cap is smooth on a 120Hz ProMotion panel but BEATS
+// against a 60Hz one, and 60Hz is already smooth uncapped). A ?maxfps= override wins outright.
+export let maxFPS = fpsOverride.cap;
 
 // The options are kept in a NAMED object (not an inline literal) because the Kaplay frame
 // loop reads `gopt.maxFPS` LIVE every step (`Rt = gopt.maxFPS ? 1/gopt.maxFPS : 0`) off the
@@ -66,12 +70,13 @@ const gameOpts = {
   touchToMouse: true,      // taps fire onClick — menu works on mobile
   // Density 1 on touch/mobile (smooth over crisp — see coarsePointer note above), capped 2 on desktop.
   pixelDensity: coarsePointer ? 1 : Math.min(window.devicePixelRatio || 1, 2),
-  // maxFPS: blocca il loop a 60fps a cadenza regolare SU MOBILE. Un iPhone ProMotion gira a
-  // 120Hz, ma l'engine free-running non tiene i 120 pieni a causa del costo JS per-frame, così
-  // la cadenza oscilla (120→95→110…) e gli intervalli irregolari si leggono come "scattoso"
-  // anche con fps medio alto. Un 60 fermo è più liscio di un 90-110 ballerino — è l'obiettivo
-  // di fluidità su mobile. Desktop resta libero (di norma già a 60Hz).
-  maxFPS, // resolved above (default 60 on touch / uncapped on desktop; URL-overridable for A/B)
+  // maxFPS: cadenza del loop, ora REFRESH-AWARE su mobile (vedi measureRefreshAndTuneCap in fondo).
+  // Un iPhone ProMotion 120Hz free-running non tiene i 120 pieni (costo JS per-frame) e la cadenza
+  // oscilla (120→95→110…) → "scattoso": lì cappiamo a ~60 (1 frame ogni 2 refresh, cadenza pari,
+  // liscia). Ma un pannello 60Hz (molti iPhone non-Pro, laptop touch) è GIÀ liscio uncapped, e un
+  // cap 60 lì "batte" contro il refresh (salti a scatti): lì restiamo uncapped. Il valore parte
+  // undefined e viene ritarato dopo la misura del refresh; desktop resta libero. URL-overridable.
+  maxFPS, // starts undefined (or the ?maxfps override); auto-tuned by refresh below
   crisp: true, // nearest-neighbour sampling so the generated 64px tiles/sprites stay sharp
   // Default UI font: the vendored pixel font (loaded in src/assets.js as "pixel"). Every
   // k.text() inherits it, so the HUD/menus read as pixel art instead of system sans-serif.
@@ -94,3 +99,41 @@ export const k = kaplay(gameOpts);
 export function setFrameCap(cap) {
   gameOpts.maxFPS = cap && cap > 0 ? cap : undefined;
 }
+
+// --- Auto-tune the ACTIVE-play cap to the REAL display refresh (touch devices only) -------------
+// Why measured, not assumed: a fixed 60 cap is smooth on a 120Hz ProMotion iPhone (Rt = 1/60, so it
+// renders every 2nd refresh, evenly) but BEATS against a 60Hz panel — many non-Pro iPhones and
+// touch laptops. The loop renders only when `accumulated > 1/maxFPS`; when the cap ≈ the refresh,
+// frame-timing jitter periodically fails that check and skips a frame, which reads as a micro-
+// stutter — worst during a jump's smooth arc (the exact symptom reported). A 60Hz panel is already
+// smooth UNCAPPED (and can't exceed 60 anyway), so the cap there is pure downside. So: sample the
+// refresh once at boot, then UNCAP ≤70Hz panels and cap high-refresh ones to render every 2nd
+// frame (≈ half the refresh, nudged up a hair so the accumulator's `>` reliably clears two frame
+// periods without occasionally slipping to a third). Desktop stays uncapped (GPU budget); a
+// ?maxfps= override is never touched. The probe finishes during loading/menu (both throttled to
+// PERF.IDLE_FPS), so the tuned value is in place well before the first level reads it on entry.
+function measureRefreshAndTuneCap() {
+  if (!coarsePointer || fpsOverride.explicit || typeof requestAnimationFrame !== "function") return;
+  const deltas = [];
+  let last = performance.now();
+  let count = 0;
+  const SAMPLES = 24; // ~0.4s @60Hz, ~0.2s @120Hz — enough to read the cadence
+  const tick = (now) => {
+    const dt = now - last;
+    last = now;
+    if (dt > 1 && dt < 100) deltas.push(dt); // ignore janky first frames / tab stalls
+    count++;
+    if (deltas.length < SAMPLES && count < SAMPLES * 3) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    if (deltas.length < 4) return; // too few good samples to trust — leave it uncapped (smooth)
+    deltas.sort((a, b) => a - b);
+    const hz = 1000 / deltas[Math.floor(deltas.length / 2)]; // median interval → refresh Hz
+    maxFPS = hz > 70 ? Math.round(hz / 2) + 2 : undefined; // tame ProMotion; uncap 60Hz-class
+    // If a level is somehow already running, apply now; otherwise scene entry picks it up.
+    if (k.getSceneName?.() === "game") setFrameCap(maxFPS);
+  };
+  requestAnimationFrame(tick);
+}
+measureRefreshAndTuneCap();

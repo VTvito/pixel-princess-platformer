@@ -37,9 +37,10 @@ physics, assets). DOM/HTML UI (`src/ui/`) is isolated from the gameplay/collisio
 `playwright-core` (the only dev dependency).
 
 Performance work that makes it smooth — and cool — on a real iPhone: `pixelDensity: 1` on touch
-devices, off-screen culling of draws, greedy-meshed solid colliders, and a per-state frame cap that
-drops the render rate when nothing is moving (menus/pause/reward) so the GPU stops cooking the phone
-while play itself stays at full 60fps — see [`CLAUDE.md`](CLAUDE.md) for the engineering notes and
+devices, off-screen culling of draws, greedy-meshed solid colliders, a per-state frame cap that
+drops the render rate when nothing is moving (menus/pause/reward) so the GPU stops cooking the phone,
+and a refresh-aware in-play cap (uncapped on 60Hz panels, tamed on 120Hz ProMotion) that keeps jumps
+smooth — see [`CLAUDE.md`](CLAUDE.md) for the engineering notes and
 gotchas.
 
 ## Run it locally

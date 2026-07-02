@@ -533,6 +533,7 @@ function makeBoss(cx, floorY, theme) {
 
   boss.bodyArt = bodyArt;
   boss.baseStone = k.rgb(...stoneArr);
+  boss.floorY = floorY; // exposed so the game scene can drop the ballroom key onto the arena floor
 
   // The game scene calls this on a successful stomp: flash, then retreat. One hit per window
   // (it closes the window and rises to attack again), so felling it always takes BOSS.HP windows.
@@ -682,6 +683,58 @@ function dropDebris(x, floorY) {
       if (rock.pos.y >= floorY + 8) k.destroy(rock); // shatter on the floor
     });
   });
+}
+
+// --- Ballroom KEY (Livello 6): the reward the Custode di Pietra drops when it is felled (spawned
+// by the game scene's fatal-stomp handler, not at level build). The key GATES the goal — the
+// ballroom doors stay sealed until the heroine walks over it (see the goal handler in game.js),
+// so it literally is "la chiave per accedere alla sala da ballo". Drawn from primitives like the
+// star/feather (a gilded bow + shaft + teeth with a warm aura), so it needs no art asset. It falls
+// from the boss's death spot, settles on the arena floor, then bobs + shimmers where she can reach
+// it. Softlock-proof: the arena top is flat and wide and the key drops at the boss's x, so it can
+// always be reached. Tag "key".
+export function spawnKey(x, y, floorY) {
+  const GOLD = [235, 200, 96];
+  const EDGE = k.rgb(120, 84, 24); // dark gilt outline
+  const restY = floorY - 30; // rests just above the floor surface (like a collectible's centre)
+  const key = k.add([
+    k.circle(16), // pickup collider (generous — a reward should feel kind)
+    k.opacity(0), // collider only; the gilded art is the children below
+    k.pos(x, Math.min(y, restY)), // start at the death spot (never below its resting spot)
+    k.anchor("center"),
+    k.area({ scale: 1.15 }),
+    k.z(8), // above the floor/scenery, below the heroine (z10)
+    "key",
+    { vy: 0, landed: false, baseY: restY, t: k.rand(0, Math.PI * 2) },
+  ]);
+  // Warm aura so it reads as precious (mirrors the star/heart halos).
+  const halo = key.add([k.circle(22), k.color(...GOLD), k.anchor("center"), k.pos(0, 0), k.opacity(0.2), k.z(-1)]);
+  // The gilded key: a bow (ring) up top with a dark eye, a shaft, and two teeth at the tip. Held
+  // in a rotate() container so the whole key can shimmer-wobble as one piece.
+  const art = key.add([k.pos(0, 0), k.rotate(0), k.z(1)]);
+  art.add([k.circle(9), k.anchor("center"), k.pos(0, -10), k.color(...GOLD), k.outline(3, EDGE)]); // bow
+  art.add([k.circle(4), k.anchor("center"), k.pos(0, -10), k.color(40, 30, 44)]); // bow eye
+  art.add([k.rect(5, 22, { radius: 2 }), k.anchor("top"), k.pos(0, -4), k.color(...GOLD), k.outline(2, EDGE)]); // shaft
+  art.add([k.rect(9, 4, { radius: 1 }), k.anchor("left"), k.pos(-1, 12), k.color(...GOLD)]); // tooth 1
+  art.add([k.rect(6, 4, { radius: 1 }), k.anchor("left"), k.pos(-1, 6), k.color(...GOLD)]); // tooth 2
+  key.onUpdate(() => {
+    const dt = k.dt();
+    key.t += dt * 3;
+    if (!key.landed) {
+      // Fall from the death spot and settle on the floor.
+      key.vy += PHYSICS.GRAVITY * 0.9 * dt;
+      key.pos.y += key.vy * dt;
+      if (key.pos.y >= restY) {
+        key.pos.y = restY;
+        key.landed = true;
+      }
+    } else {
+      key.pos.y = key.baseY + Math.sin(key.t) * 4; // gentle bob once settled
+    }
+    art.angle = Math.sin(key.t * 0.7) * 6; // slow shimmer wobble
+    halo.opacity = 0.14 + 0.14 * (0.5 + 0.5 * Math.sin(key.t * 2));
+  });
+  return key;
 }
 
 // --- Roller: a snowball that wakes when the heroine is near and gives chase along the

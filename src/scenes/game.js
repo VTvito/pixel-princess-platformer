@@ -39,7 +39,7 @@ import {
 import { bindKeyboard, resetInput } from "../controls.js";
 import { makePlayer, addSkinLayers, syncSkins } from "../entities/player.js";
 import { getLevelDef, hasLevel } from "../levels/index.js";
-import { buildLevel } from "../levels/build.js";
+import { buildLevel, spawnKey } from "../levels/build.js";
 import { showInsertCoin, hideInsertCoin } from "../ui/insertCoin.js";
 import { showGameOver, hideGameOver } from "../ui/gameOver.js";
 import { hideLeaderboard } from "../ui/leaderboard.js";
@@ -115,6 +115,9 @@ export function registerGameScene() {
 
     // Build the tile map (platforms, ravines, hazards, collectibles, enemies, goal).
     const { spawn, worldW, worldH, collectiblesTotal } = buildLevel(def);
+    // Does this level have the final boss? Only then is the goal gated on defeating it + grabbing
+    // the key it drops (Livello 6). Levels without a boss keep the plain walk-into-the-goal ending.
+    const bossLevel = k.get("boss").length > 0;
 
     // Where does the heroine start?
     //  • A death-retry on this same level resumes from the in-memory checkpoint.
@@ -183,6 +186,10 @@ export function registerGameScene() {
     // (skins persist, since they're derived from the saved level in state — not reset here).
     let finished = false;
     let dead = false;
+    // Ballroom key (Livello 6): set once she grabs the key the felled boss drops. The goal gate
+    // below stays sealed until this is true (on boss levels). Reset per scene entry (a death
+    // rebuilds the level, so the boss is alive again and the key must be re-earned).
+    let keyTaken = false;
     // Star power-up: while invincible, hazards/enemies can't hurt the heroine and touching an
     // enemy defeats it. A fall off the world still ends the run (handled in die's callers).
     let invincibleUntil = 0;
@@ -276,10 +283,17 @@ export function registerGameScene() {
     // (tagged "hazard", handled above) can hurt her. This is the encounter's softlock-proofing:
     // she can never die just by being near the boss, only by failing to dodge a telegraphed
     // attack. She damages it ONLY by stomping from above during its vulnerable window
-    // (boss.invulnerable === false); each hit enrages it. Felling it destroys the lone "boss"
-    // object, which unlocks the gated goal (see the goal handler). Guaranteed beatable: the
-    // boss's vulnerable window recurs forever regardless of where she stands.
-    player.onCollide("boss", (boss) => {
+    // (boss.invulnerable === false); each hit enrages it. Felling it drops the ballroom KEY (see
+    // the key handler + goal gate below). Guaranteed beatable: the vulnerable window recurs forever.
+    //
+    // onCollideUpdate (NOT onCollide): the boss's tall hitbox during the window sits just below the
+    // single-jump apex, so a jump from the floor ENTERS the hitbox while she's still RISING — the
+    // one-shot onCollide-ENTER event fired on the way up (not a stomp) and, since her apex never
+    // clears the top to re-separate, no fresh enter fired on the way down → the stomp was NEVER
+    // registered (the boss felt impossible to hit). Checking every overlapping frame catches the
+    // descent reliably. After a hit the boss retreats (invulnerable + ascend) and the bounce flips
+    // vel.y up, so the very next frame isn't a stomp → still exactly one hit per window.
+    player.onCollideUpdate("boss", (boss) => {
       if (finished || dead) return;
       const stomping = player.vel.y > 60 && player.pos.y < boss.pos.y;
       if (!stomping) return; // body contact is safe — the danger is the attacks, not the stone
@@ -287,12 +301,14 @@ export function registerGameScene() {
       if (boss.invulnerable) return; // hovering/attacking out of reach → no damage this hit
       boss.hp -= 1;
       if (boss.hp <= 0) {
-        // Felled: confetti, a big impact, triple points — then it's gone and the doors open.
+        // Felled: confetti, a big impact, triple points — then it drops the ballroom KEY and is
+        // gone. The doors stay sealed until she grabs the key (see the goal gate).
         confettiBurst(boss.pos, [theme.collectible, PALETTE.cream, PALETTE.gold]);
         sfx("stomp");
         screenShake(6);
         dustPuff(boss.pos);
         bumpScore(SCORE.STOMP * 3);
+        spawnKey(boss.pos.x, boss.pos.y, boss.floorY); // the key to the ballroom drops to the floor
         k.destroy(boss);
       } else {
         boss.onStomped?.(); // flash + retreat; it rises to attack again, faster
@@ -302,6 +318,16 @@ export function registerGameScene() {
         dustPuff(boss.pos);
         bumpScore(SCORE.STOMP);
       }
+    });
+    // The ballroom KEY the boss drops when felled (spawnKey, build.js). Grabbing it is what opens
+    // the goal — the doors stay sealed until she has it (see the gate below).
+    player.onCollide("key", (key) => {
+      if (finished || dead) return;
+      confettiBurst(key.pos, [PALETTE.gold, PALETTE.cream, theme.collectible]);
+      sfx("collect");
+      k.destroy(key);
+      keyTaken = true;
+      showBossHint("La Sala da Ballo è aperta!");
     });
     // Checkpoint flag (Phase 4): touching it sets the respawn point for this level —
     // deaths still cost 500 Coccoline (the meta is sacred), but the retry starts here.
@@ -545,13 +571,14 @@ export function registerGameScene() {
       updateLives();
     });
 
-    // A throttled floating hint when she reaches a still-gated goal (Livello 6 boss).
+    // A throttled floating hint above the heroine (Livello 6 boss gate: which step is missing,
+    // or the "doors are open" cue once she has the key).
     let bossHintAt = 0;
-    function showBossHint() {
+    function showBossHint(msg) {
       if (k.time() < bossHintAt) return;
       bossHintAt = k.time() + 2.2;
       const hint = k.add([
-        k.text("Sconfiggi il Custode per passare!", { size: 24 }),
+        k.text(msg, { size: 24 }),
         k.pos(player.pos.x, player.pos.y - 96),
         k.anchor("center"),
         k.color(...PALETTE.gold),
@@ -570,11 +597,18 @@ export function registerGameScene() {
     player.onCollide("goal", () => {
       if (finished || dead) return;
       // Boss gate (Livello 6): the ballroom doors stay sealed until the Custode di Pietra is
-      // felled. As soon as the lone "boss" object is destroyed this check passes — no physical
-      // wall to get stuck behind, and the boss is guaranteed beatable, so this can't softlock.
-      if (k.get("boss").length > 0) {
-        showBossHint();
-        return;
+      // felled AND the heroine has picked up the KEY it drops. Both are guaranteed reachable (the
+      // boss is beatable, the key drops on the flat arena floor), so this can't softlock — there's
+      // no physical wall to wedge behind. Levels without a boss skip the gate entirely.
+      if (bossLevel) {
+        if (k.get("boss").length > 0) {
+          showBossHint("Sconfiggi il Custode per passare!");
+          return;
+        }
+        if (!keyTaken) {
+          showBossHint("Raccogli la Chiave della Sala da Ballo!");
+          return;
+        }
       }
       finished = true;
       checkpointAt = null; // the journey continues — next level starts clean

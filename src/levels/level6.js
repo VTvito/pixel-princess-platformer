@@ -8,8 +8,9 @@
 // Arc: intro (the entrance hall, a bat overhead) → develop (the first chandelier, then
 // the cellar-pit crossing) → twist (the chandelier gauntlet + a crumbling minstrel
 // ledge) → climax (the grand staircase and the FINAL BOSS, the "Custode di Pietra" — a
-// 2-hp multi-phase stone guardian that GATES the ballroom doors: dodge its shockwaves and
-// falling debris, then stomp it during its vulnerable window. See build.js makeBoss).
+// 3-hp multi-phase stone guardian that GATES the ballroom doors: dodge its shockwaves and
+// falling debris, then stomp it during its vulnerable window. Felling it drops the ballroom
+// KEY, which the heroine must grab to open the doors. See build.js makeBoss / spawnKey).
 
 import { composeMap, arcCollectibles, laneFor, airFor } from "./mapkit.js";
 
@@ -130,10 +131,11 @@ export const LEVEL_6 = {
       // instead.)
       { x: 72, y: 8, ch: "S" },
       // THE FINAL BOSS — "Custode di Pietra". It owns the flat staircase top and GATES the
-      // ballroom doors: the goal stays inert until the boss is felled (see game.js). Unlike the
-      // old sneak-past Gargoyle, this is a real multi-phase fight — it hovers out of reach
-      // raining attacks (a ground SHOCKWAVE to jump, and falling DEBRIS), then DESCENDS into a
-      // vulnerable window to be stomped, enraging with each hit. The tile y is only its column
+      // ballroom doors: the goal stays inert until the boss is felled AND the KEY it drops is
+      // grabbed (see game.js). Unlike the old sneak-past Gargoyle, this is a real multi-phase
+      // fight — it hovers out of reach raining attacks (a ground SHOCKWAVE to jump, and falling
+      // DEBRIS), then DESCENDS into a vulnerable window to be stomped (3 hits), enraging with each
+      // hit; felled, it drops the ballroom key on the arena floor. The tile y is only its column
       // (makeBoss derives its hover/window heights from the arena floor it scans below). Centred
       // at x=119 so it has room on both sides over the x112-125 staircase top. See build.js.
       { x: 119, y: 4, ch: "G" },

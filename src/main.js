@@ -63,10 +63,32 @@ if (
   location.hostname !== "localhost" &&
   location.hostname !== "127.0.0.1"
 ) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {
-      // Offline support just won't be available this session — never break the game over it.
+  // Keep an installed PWA on the latest deploy. If a worker already controls this page, a later
+  // `controllerchange` means a NEW deploy's worker took over (sw.js does skipWaiting + clients.claim
+  // so it activates at once) → reload once so the running session switches to the fresh code. The
+  // "already controlled" guard skips the reload on the very first install (nothing to replace); the
+  // update check runs at load / on foreground, so any reload lands near startup, not mid-level.
+  let reloading = false;
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
     });
+  }
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then((reg) => {
+        reg.update?.(); // check for a newer worker now…
+        // …and again whenever the installed app is brought back to the foreground.
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") reg.update?.();
+        });
+      })
+      .catch(() => {
+        // Offline support just won't be available this session — never break the game over it.
+      });
   });
 }
 

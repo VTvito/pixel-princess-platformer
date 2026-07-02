@@ -105,7 +105,7 @@ export function bindFpsOverlay() {
       "worst   : " + worst.toFixed(1) + " ms",
       "objects : " + countObjects(),
       "coarse  : " + (coarse ? "yes" : "no"),
-      "maxFPS  : " + (maxFPS ?? "uncapped"), // reflects the ?maxfps= override
+      "maxFPS  : " + (maxFPS ?? "uncapped"), // refresh-tuned cap in force (or the ?maxfps= override)
       "dpr     : " + (window.devicePixelRatio || 1),
     ].join("\n");
     frames = 0;

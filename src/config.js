@@ -224,7 +224,12 @@ export const POWERUP = {
 // above the arena floor (px) so makeBoss positions itself relative to the staircase top it
 // scans below — tuned against the single-jump apex (≈148px). Units: px, px/s, s.
 export const BOSS = {
-  HP: 2,                  // stomps to fell it (one hit per vulnerable window) — eased for mobile
+  HP: 3,                  // stomps to fell it (one hit per vulnerable window). Back to 3 now that
+                          // the stomp registers reliably: the hit is detected via onCollideUpdate
+                          // in game.js (a jump from BELOW entered the tall hitbox while still
+                          // rising, so the single onCollide-ENTER event was wasted and the descent
+                          // never re-fired — she could never land a hit). With that fixed, 3 hits
+                          // is fair. Felling it drops the ballroom KEY (see spawnKey / the goal gate).
   W: 104,                 // visual/hitbox width (a hulking stone guardian)
   H: 96,                  // visual/hitbox height
   AREA_SCALE: 0.92,       // stomp hitbox a touch forgiving
