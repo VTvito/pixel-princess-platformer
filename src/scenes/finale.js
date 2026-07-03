@@ -6,8 +6,9 @@
 
 import { k, setFrameCap } from "../kaplayCtx.js";
 import { GAME_W, GAME_H, PALETTE, CHARACTERS, SKINS, FINALE, PERF } from "../config.js";
-import { getSelectedCharacter, getCoccoline, getCoccolineRun, getScore } from "../state.js";
+import { getSelectedCharacter, getCoccoline, getCoccolineRun, getScore, getRunTime } from "../state.js";
 import { addSkinLayers, syncSkins } from "../entities/player.js";
+import { formatDuration } from "../format.js";
 import { resetInput } from "../controls.js";
 import { showReceipt, hideReceipt } from "../ui/receipt.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
@@ -53,12 +54,15 @@ export function registerFinaleScene() {
     k.wait(0.2, () => sfx("win")); // warm fanfare as the ballroom settles in
 
     // --- The heroine as "Principessa Perfetta": base body + all six skins layered on ---
-    const baseY = 286;
+    // Sits a touch higher + smaller than before so the message box below can grow: the
+    // heartfelt letter was hard to read on a phone (the whole 1280×720 canvas letterboxes into
+    // ~932×430 on an iPhone, shrinking every glyph), so the box now hosts noticeably larger text.
+    const baseY = 262;
     const avatar = k.add([
       k.sprite(char.sprite),
       k.pos(GAME_W / 2, baseY),
       k.anchor("center"),
-      k.scale(2.7),
+      k.scale(2.35),
       k.z(10),
       "avatar",
     ]);
@@ -70,6 +74,18 @@ export function registerFinaleScene() {
       avatar.pos.y = baseY + Math.sin(k.time() * 1.5) * 6;
       syncSkins(avatar);
     });
+
+    // Final run time (time-attack): a small scoreboard header at the very top, so the net
+    // completion time is on screen through the read, before the receipt/leaderboard appear.
+    // "Tempo finale M:SS" is only letters/digits/colon → the pixel font renders it (no override).
+    k.add([
+      k.text(`Tempo finale  ${formatDuration(getRunTime())}`, { size: 24 }),
+      k.pos(GAME_W / 2, 44),
+      k.anchor("center"),
+      k.color(...PALETTE.cream),
+      k.opacity(0.9),
+      k.z(11),
+    ]);
 
     // Caption above the heroine. The crown is its own object with NO color tint, so it
     // renders as a full-colour emoji — k.color() multiplies (and would darken) the glyph.
@@ -86,22 +102,24 @@ export function registerFinaleScene() {
     // --- Message box (the personalized note; sized for the six-chapter message) ---
     // Box, title and body are tuned so the eight-line message sits fully inside the frame
     // (it used to spill past the bottom edge): the body is centred in the space below the
-    // title with margin to spare above the "Torna al menu" button.
-    const boxW = 820;
-    const boxH = 256;
-    const boxY = 518;
+    // title with margin to spare above the "Torna al menu" button. Enlarged for phone
+    // legibility — bigger body text (18→22), roomier line spacing, a wider + taller fully
+    // opaque card — since at the iPhone letterbox scale the old size-18 letter was a squint.
+    const boxW = 900;
+    const boxH = 300;
+    const boxY = 506;
     k.add([
       k.rect(boxW, boxH, { radius: 20 }),
       k.pos(GAME_W / 2, boxY),
       k.anchor("center"),
       k.color(...PALETTE.cream),
-      k.opacity(0.95),
+      k.opacity(1), // fully opaque — max contrast for the dark letter over the cream card
       k.outline(4, k.rgb(...PALETTE.gold)),
       k.z(20),
     ]);
     k.add([
-      k.text(FINALE.title, { size: 28 }),
-      k.pos(GAME_W / 2, boxY - boxH / 2 + 32),
+      k.text(FINALE.title, { size: 32 }),
+      k.pos(GAME_W / 2, boxY - boxH / 2 + 36),
       k.anchor("center"),
       k.color(...PALETTE.rose),
       k.z(21),
@@ -110,8 +128,8 @@ export function registerFinaleScene() {
       // The heartfelt letter is the one place the pixel font hurt readability (long-form text),
       // so this single object overrides to "sans-serif" — the same per-object escape hatch the
       // emoji labels use. Titles + the button above/below stay pixel for the fairy-tale look.
-      k.text(FINALE.message, { size: 18, width: boxW - 72, align: "center", lineSpacing: 4, font: "sans-serif" }),
-      k.pos(GAME_W / 2, boxY + 22),
+      k.text(FINALE.message, { size: 22, width: boxW - 80, align: "center", lineSpacing: 7, font: "sans-serif" }),
+      k.pos(GAME_W / 2, boxY + 30),
       k.anchor("center"),
       k.color(...PALETTE.deepBlue),
       k.z(21),
@@ -170,7 +188,7 @@ export function registerFinaleScene() {
     });
     lbBtn.onClick(() => {
       sfx("select");
-      openLeaderboard({ score: getScore() });
+      openLeaderboard({ score: getScore(), timeMs: getRunTime() });
     });
 
     // The payoff: the receipt is a full-screen overlay that covers the heartfelt
@@ -181,7 +199,9 @@ export function registerFinaleScene() {
     // re-open fallback (and the leaderboard degrades gracefully offline — see leaderboard.js).
     const RECEIPT_DELAY = 10; // s — an unhurried read of the six-chapter message before the receipt
     k.wait(RECEIPT_DELAY, () =>
-      showReceipt(getCoccolineRun(), getCoccoline(), () => openLeaderboard({ score: getScore() })),
+      showReceipt(getCoccolineRun(), getCoccoline(), getRunTime(), () =>
+        openLeaderboard({ score: getScore(), timeMs: getRunTime() }),
+      ),
     );
   });
 }

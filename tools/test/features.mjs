@@ -147,6 +147,14 @@ try {
   check("player jumps", yGround - yApex > 60, `dy=${(yGround - yApex).toFixed(1)}`);
   check("air anim while jumping", airAnim === "jump", `anim=${airAnim}`);
 
+  // --- Time-attack: the run clock accumulates net play time (state.js addRunTime, persisted to
+  // pj.runTime ~once/second). During active play it must advance; a pause must freeze it (the
+  // paused tree halts the accumulating onUpdate). ---
+  const rt0 = await page.evaluate(() => Number(localStorage.getItem("pj.runTime") || "0"));
+  await page.waitForTimeout(1300); // active play — the onUpdate accumulates k.dt()
+  const rt1 = await page.evaluate(() => Number(localStorage.getItem("pj.runTime") || "0"));
+  check("run timer ticks during play", rt1 > rt0 + 500, `${rt0}→${rt1}ms`);
+
   // --- Fase 1b Pause: ESC freezes the whole game tree + shows the DOM overlay; a held key
   // must not move her while frozen; ESC again resumes (proves k.onKeyPress fires while the
   // tree is paused). A DOM-button safety net unpauses if keyboard-resume ever regresses, so
@@ -164,6 +172,13 @@ try {
     frozen: window.__pj.k.getTreeRoot().paused,
   }));
   check("ESC pauses + freezes", pausedState.overlay && pausedState.frozen, JSON.stringify(pausedState));
+
+  // The run clock must NOT advance while paused (excludes pauses from the time-attack). Wait well
+  // over a second so a regression that kept counting would surely bump the ~1/s-persisted value.
+  const rtPaused0 = await page.evaluate(() => Number(localStorage.getItem("pj.runTime") || "0"));
+  await page.waitForTimeout(1600);
+  const rtPaused1 = await page.evaluate(() => Number(localStorage.getItem("pj.runTime") || "0"));
+  check("run timer freezes while paused", rtPaused1 === rtPaused0, `${rtPaused0}→${rtPaused1}ms`);
 
   const xPaused0 = await px();
   await page.keyboard.down("ArrowRight");
@@ -502,10 +517,12 @@ try {
     level: localStorage.getItem("pj.currentLevel"),
     score: localStorage.getItem("pj.score"),
     lives: localStorage.getItem("pj.lives"),
+    runTime: localStorage.getItem("pj.runTime"),
     coccoline: Number(localStorage.getItem("totaleCoccoline")),
   }));
   check("Game Over resets to level 1", reset.level === "1", `level=${reset.level}`);
   check("Game Over wipes the score", reset.score === "0", `score=${reset.score}`);
+  check("Game Over resets the run timer", reset.runTime === "0", `runTime=${reset.runTime}`);
   check("Game Over refills lives", reset.lives === "3", `lives=${reset.lives}`);
   check("Game Over keeps the Coccoline tab", reset.coccoline > 0, `coccoline=${reset.coccoline}`);
 

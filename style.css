@@ -545,9 +545,20 @@ body.playing #pause-toggle {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Time-attack: the classifica ranks by fastest time, so the time is the emphasised column
+   (dark + bold, tabular figures so the digits line up); the score rides along, dimmer + smaller. */
+.lb-time {
+  color: #26325c;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .lb-pts {
   color: #d4af37;
   font-weight: 700;
+  font-size: 15px;
+  opacity: 0.85;
+  white-space: nowrap;
 }
 .lb-status {
   min-height: 22px;

@@ -82,7 +82,7 @@ export function registerMenuScene() {
 
     // Title (cream so it reads on the dusk backdrop).
     k.add([
-      k.text("The Princess Journey", { size: 64 }),
+      k.text("Un dono per Anna", { size: 64 }),
       k.pos(GAME_W / 2, 110),
       k.anchor("center"),
       k.color(...PALETTE.cream),
@@ -101,7 +101,7 @@ export function registerMenuScene() {
 
     // --- Start layer ---
     startLayer.add([
-      k.text("Un dono per Anna", { size: 28 }),
+      k.text("Un viaggio in sei mondi incantati", { size: 28 }),
       k.pos(GAME_W / 2, 200),
       k.anchor("center"),
       k.color(...PALETTE.cream),

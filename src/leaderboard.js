@@ -6,7 +6,7 @@
 
 const ENDPOINT = "/api/leaderboard";
 
-/** Fetch the current top 10 as `[{ name, score }, …]`, or `null` if unavailable. */
+/** Fetch the current top 10 as `[{ name, time, score }, …]`, or `null` if unavailable. */
 export async function fetchTop() {
   try {
     const res = await fetch(ENDPOINT, { method: "GET" });
@@ -19,15 +19,16 @@ export async function fetchTop() {
 }
 
 /**
- * Submit a score. Returns the updated top 10 on success, or `null` if unavailable.
- * The backend keeps the BEST score per nickname, so re-submitting is harmless.
+ * Submit a time-attack result (net play time in ms + the run's score). Returns the updated top 10
+ * on success, or `null` if unavailable. The backend keeps the BEST (fastest) time per nickname, so
+ * re-submitting a slower run is harmless.
  */
-export async function submitScore({ nickname, score, character }) {
+export async function submitScore({ nickname, score, timeMs }) {
   try {
     const res = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nickname, score, character }),
+      body: JSON.stringify({ nickname, score, timeMs }),
     });
     if (!res.ok) return null;
     const data = await res.json();

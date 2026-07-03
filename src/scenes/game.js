@@ -27,6 +27,8 @@ import {
   addCoccoline,
   addScore,
   getScore,
+  addRunTime,
+  getRunTime,
   getLives,
   addLife,
   addHeartTaken,
@@ -40,6 +42,7 @@ import { bindKeyboard, resetInput } from "../controls.js";
 import { makePlayer, addSkinLayers, syncSkins } from "../entities/player.js";
 import { getLevelDef, hasLevel } from "../levels/index.js";
 import { buildLevel, spawnKey } from "../levels/build.js";
+import { formatDuration } from "../format.js";
 import { showInsertCoin, hideInsertCoin } from "../ui/insertCoin.js";
 import { showGameOver, hideGameOver } from "../ui/gameOver.js";
 import { hideLeaderboard } from "../ui/leaderboard.js";
@@ -493,6 +496,29 @@ export function registerGameScene() {
       k.z(50),
     ]);
     const updateLives = () => (livesLabel.text = `♥ ${getLives()}`);
+    // Time-attack clock (arcade timer): the NET play time of the whole run, ticking under the
+    // lives in the same left column. sans-serif for the ⏱ glyph, like the emoji counters above.
+    const timeLabel = k.add([
+      k.text(`⏱ ${formatDuration(getRunTime())}`, { size: 22, font: "sans-serif" }),
+      k.pos(88, 176),
+      k.color(...hudColor),
+      k.fixed(),
+      k.z(50),
+    ]);
+    // Accumulate elapsed time each frame during ACTIVE play only, and refresh the label once per
+    // whole second. A pause freezes the tree so this onUpdate never runs (pauses excluded for
+    // free); a death only freezes the player, not the tree, so the !dead/!finished guards stop
+    // the clock during the Insert-Coin / reward overlays. Rebuild the string only when the shown
+    // second changes (same GC-sparing trick as the power-up counters below).
+    let lastTimeSec = -1;
+    k.onUpdate(() => {
+      if (!finished && !dead) addRunTime(k.dt());
+      const sec = Math.floor(getRunTime() / 1000);
+      if (sec !== lastTimeSec) {
+        lastTimeSec = sec;
+        timeLabel.text = `⏱ ${formatDuration(getRunTime())}`;
+      }
+    });
     // Invincibility indicator (top centre): shown only while a star is active, counting down.
     const invLabel = k.add([
       // sans-serif: shows "★ INVINCIBILE …" and the ★ glyph isn't in the pixel font.
@@ -911,8 +937,8 @@ function showReward(reward, got, total, icon, nextLevel) {
     ]);
   }
   k.add([
-    // sans-serif: contains the collectible emoji + ★, neither of which the pixel font has.
-    k.text(`${icon} ${got}/${total}    ★ ${getScore()}`, { size: 26, font: "sans-serif" }),
+    // sans-serif: contains the collectible emoji + ★ + ⏱, none of which the pixel font has.
+    k.text(`${icon} ${got}/${total}    ★ ${getScore()}    ⏱ ${formatDuration(getRunTime())}`, { size: 26, font: "sans-serif" }),
     k.pos(GAME_W / 2, GAME_H / 2 + 160),
     k.anchor("center"),
     k.color(...PALETTE.cream),

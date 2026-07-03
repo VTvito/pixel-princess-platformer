@@ -11,7 +11,7 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#26325c" />
-    <title>The Princess Journey</title>
+    <title>Un dono per Anna</title>
     <!-- SEO + social link previews (GitHub/WhatsApp/Twitter card). og:image must be an
          absolute URL on the live origin; assets/ is deployed, so the screenshot resolves. -->
     <meta
@@ -19,7 +19,7 @@
       content="A no-build browser platformer: 6 themed levels, a multi-phase boss, PWA & mobile support, with procedurally generated pixel-art and chiptune."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="The Princess Journey" />
+    <meta property="og:title" content="Un dono per Anna" />
     <meta
       property="og:description"
       content="A no-build browser platformer: 6 themed levels, a multi-phase boss, PWA & mobile support, with procedurally generated pixel-art and chiptune."
@@ -49,8 +49,8 @@
     <!-- Primary content lives in a <main> landmark (accessibility audit: a document must have
          one main landmark). `main { display: contents }` (style.css) removes its box, so the
          canvas keeps its exact layout — Kaplay still grabs it via querySelector("#game"). -->
-    <main id="app" aria-label="The Princess Journey">
-      <h1 class="visually-hidden">The Princess Journey</h1>
+    <main id="app" aria-label="Un dono per Anna">
+      <h1 class="visually-hidden">Un dono per Anna</h1>
       <!-- Kaplay renders here; it letterboxes the 16:9 canvas inside the viewport.
            tabindex makes the canvas focusable so keyboard input keeps working after the DOM
            "Insert Coin" overlay steals focus on respawn (see src/scenes/game.js focusCanvas). -->
@@ -159,6 +159,7 @@
         <p class="receipt-line">Costo di questa avventura:</p>
         <p class="receipt-total"><span id="receipt-amount">0</span> Coccoline</p>
         <p class="receipt-line">Totale storico: <span id="receipt-lifetime">0</span> Coccoline</p>
+        <p class="receipt-line">Tempo di gioco: <span id="receipt-time">0:00</span></p>
         <div class="receipt-rule"></div>
         <p class="receipt-foot">Grazie per aver giocato ❤️</p>
         <button id="receipt-pay" type="button" class="ui-btn pay-btn">Paga il Debito!</button>
@@ -173,6 +174,7 @@
         <p class="pause-title">Classifica</p>
         <div id="lb-form">
           <p class="lb-prompt">Il tuo punteggio: <span id="lb-score">0</span> ★</p>
+          <p class="lb-prompt">Il tuo tempo: <span id="lb-time">0:00</span> ⏱</p>
           <input
             id="nickname-input"
             type="text"

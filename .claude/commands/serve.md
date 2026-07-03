@@ -1,5 +1,5 @@
 ---
-description: Start the local dev server for The Princess Journey and print the play URL
+description: Start the local dev server for Un dono per Anna and print the play URL
 argument-hint: "[port]"
 ---
 Start the game's local dev server so it can be played in a browser (or driven with Playwright).

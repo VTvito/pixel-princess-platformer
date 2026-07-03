@@ -1,6 +1,6 @@
-# 👑 The Princess Journey
+# 👑 Un dono per Anna
 
-![The Princess Journey — gameplay](assets/screenshot.png)
+![Un dono per Anna — gameplay](assets/screenshot.png)
 
 **[▶ Play it live](https://gameforprincess.vercel.app)** · License: MIT · Built with [Kaplay](https://kaplayjs.com/) — no build step
 

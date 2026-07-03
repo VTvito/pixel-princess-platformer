@@ -12,6 +12,7 @@ const KEYS = {
   checkpoint: "pj.checkpoint", // JSON {level, x, y} — the last flag touched this run
   heartsTaken: "pj.heartsTaken", // JSON [level…] — hearts already grabbed THIS run (no respawn)
   nickname: "pj.nickname",     // remembered name for the global leaderboard
+  runTime: "pj.runTime",       // net play time of THIS run in ms (time-attack; excludes pauses)
 };
 
 function read(key) {
@@ -88,6 +89,41 @@ export function addScore(amount) {
 export function resetScore() {
   state.score = 0;
   write(KEYS.score, "0");
+}
+
+// --- Time-attack run timer ---------------------------------------------------
+// The NET play time of the current run, in milliseconds — the "tempo" scored on the finale and
+// the global leaderboard. It accumulates only during active gameplay (game.js adds k.dt() each
+// frame while the world runs; a pause halts every onUpdate so pauses are excluded for free, and a
+// death is guarded out). It is persisted like the score so an interruption (reload, menu→resume)
+// keeps the elapsed time, and follows the SAME lifecycle as the score: wiped by resetRun() (Game
+// Over / "Nuova partita") so the leaderboard tempo reflects the single successful run, never a
+// tally across restarts. Kept in memory (not read-on-demand) since it's written every frame.
+let runTimeMs = clampScore(parseInt(read(KEYS.runTime) || "0", 10));
+// Only touch localStorage when the whole-second display would change (~1 write/s) — persisting on
+// every one of 60 frames/s would thrash storage for no visible gain, yet a crash still loses <1s.
+let lastPersistedSec = Math.floor(runTimeMs / 1000);
+
+export function getRunTime() {
+  return runTimeMs;
+}
+
+// Accumulate elapsed play time. `dtSeconds` is Kaplay's frame delta (k.dt()).
+export function addRunTime(dtSeconds) {
+  if (!(dtSeconds > 0)) return runTimeMs; // ignore NaN / non-positive deltas
+  runTimeMs += dtSeconds * 1000;
+  const sec = Math.floor(runTimeMs / 1000);
+  if (sec !== lastPersistedSec) {
+    lastPersistedSec = sec;
+    write(KEYS.runTime, String(Math.round(runTimeMs)));
+  }
+  return runTimeMs;
+}
+
+export function resetRunTime() {
+  runTimeMs = 0;
+  lastPersistedSec = 0;
+  write(KEYS.runTime, "0");
 }
 
 // --- Arcade lives -----------------------------------------------------------
@@ -193,6 +229,7 @@ export function setNickname(name) {
 export function resetRun() {
   setCurrentLevel(1);
   resetScore();
+  resetRunTime(); // the time-attack clock restarts with the journey (like the score)
   setLives(LIVES.START);
   clearCheckpoint();
   clearHeartsTaken(); // a fresh run hands out every level's heart again
@@ -204,6 +241,7 @@ export function resetProgress() {
   state.currentLevel = 1;
   state.score = 0;
   state.lives = LIVES.START;
+  resetRunTime();
   try {
     window.localStorage.removeItem(KEYS.character);
     window.localStorage.removeItem(KEYS.level);

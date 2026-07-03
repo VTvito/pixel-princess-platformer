@@ -1,4 +1,4 @@
-// Per-level visual + smoke check for The Princess Journey.
+// Per-level visual + smoke check for Un dono per Anna.
 //
 // Boots each playable level (1–6) in the installed Edge via playwright-core, asserts it
 // renders with no console/page errors and that the world actually built (a goal + the

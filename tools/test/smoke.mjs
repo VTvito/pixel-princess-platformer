@@ -1,4 +1,4 @@
-// Standalone browser smoke test for The Princess Journey.
+// Standalone browser smoke test for Un dono per Anna.
 //
 // Launches the installed Microsoft Edge via playwright-core (NO browser download)
 // and verifies the game boots cleanly to the menu with no console/page errors —

@@ -1,6 +1,6 @@
 ---
 name: mobile-check
-description: Run the iPhone-landscape emulation checks for The Princess Journey (audio unlock, touch controls, landscape fit, install hint) and review the screenshots. Use when asked to test the mobile or iOS experience.
+description: Run the iPhone-landscape emulation checks for Un dono per Anna (audio unlock, touch controls, landscape fit, install hint) and review the screenshots. Use when asked to test the mobile or iOS experience.
 ---
 
 # Mobile / iOS check

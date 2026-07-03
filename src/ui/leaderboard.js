@@ -7,10 +7,12 @@
 
 import { fetchTop, submitScore } from "../leaderboard.js";
 import { getNickname, setNickname } from "../state.js";
+import { formatDuration } from "../format.js";
 
 let overlay = null;
 let form = null;
 let scoreEl = null;
+let timeEl = null;
 let input = null;
 let submitBtn = null;
 let listEl = null;
@@ -21,6 +23,7 @@ function els() {
   overlay ||= document.getElementById("leaderboard-overlay");
   form ||= document.getElementById("lb-form");
   scoreEl ||= document.getElementById("lb-score");
+  timeEl ||= document.getElementById("lb-time");
   input ||= document.getElementById("nickname-input");
   submitBtn ||= document.getElementById("lb-submit");
   listEl ||= document.getElementById("lb-list");
@@ -50,21 +53,30 @@ function renderTop(list) {
     const name = document.createElement("span");
     name.className = "lb-name";
     name.textContent = row.name;
+    // Time-attack: the rank is BY time (fastest first), so the time is the emphasised column;
+    // the run's score rides along as a secondary stat.
+    const time = document.createElement("span");
+    time.className = "lb-time";
+    time.textContent = `${formatDuration(row.time)} ⏱`;
     const pts = document.createElement("span");
     pts.className = "lb-pts";
-    pts.textContent = `${row.score} ★`;
-    li.append(rank, name, pts);
+    pts.textContent = `${row.score ?? 0} ★`;
+    li.append(rank, name, time, pts);
     listEl.appendChild(li);
   });
 }
 
-/** Open in SUBMIT mode (finale): prefill the nickname, show the form, list current standings. */
-export function openLeaderboard({ score }) {
+/**
+ * Open in SUBMIT mode (finale): prefill the nickname, show the form with the run's time + score,
+ * list current standings. The classifica ranks by fastest time (time-attack).
+ */
+export function openLeaderboard({ score, timeMs }) {
   els();
   if (!overlay) return;
   overlay.hidden = false;
   if (form) form.hidden = false;
   if (scoreEl) scoreEl.textContent = String(score);
+  if (timeEl) timeEl.textContent = formatDuration(timeMs);
   if (input) input.value = getNickname();
   if (statusEl) statusEl.textContent = "Caricamento…";
   if (listEl) listEl.innerHTML = "";
@@ -79,7 +91,7 @@ export function openLeaderboard({ score }) {
     setNickname(nickname);
     if (submitBtn) submitBtn.disabled = true;
     if (statusEl) statusEl.textContent = "Invio…";
-    const top = await submitScore({ nickname, score });
+    const top = await submitScore({ nickname, score, timeMs });
     if (submitBtn) submitBtn.disabled = false;
     if (top) {
       if (form) form.hidden = true; // sent — collapse the form, show the standings

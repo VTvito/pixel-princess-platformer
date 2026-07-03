@@ -1,22 +1,36 @@
-// api/leaderboard.js — Vercel serverless endpoint for the GLOBAL leaderboard.
+// api/leaderboard.js — Vercel serverless endpoint for the GLOBAL time-attack leaderboard.
 //
 // A tiny, dependency-free function (CommonJS so it runs whether or not a package.json ships;
 // global `fetch` is built in on Vercel's Node runtime). It talks to a Redis store provisioned
 // through the Vercel Marketplace (Upstash Redis — the successor to the retired "Vercel KV";
-// works on the free Hobby plan) over its REST API: a single sorted set holds the best score
-// per nickname, and the top 10 are read back with ZREVRANGE.
+// works on the free Hobby plan) over its REST API.
 //
-//   GET  /api/leaderboard            -> { top: [{ name, score }, ...] }   (top 10, high -> low)
-//   POST /api/leaderboard {nickname, score}  -> { ok: true, top: [...] }  (best-score, then top)
+// Time-attack model — rank by the FASTEST net play time to finish the six levels; the run's
+// score rides along as a secondary stat:
+//   • a sorted set  KEY_TIME  (pj:lb:time)  member = nickname, score = net time in ms →
+//     read back ascending (ZRANGE) so the quickest run is #1.
+//   • a hash        KEY_SCORE (pj:lb:score) field  = nickname, value = the score of that
+//     best-time run, so the standings can show the points alongside the time.
+//   We keep each nickname's BEST (lowest) time via `ZADD LT` and only overwrite the stored score
+//   when the time actually improved (the `CH` flag tells us whether it did).
+//
+//   GET  /api/leaderboard                      -> { top: [{ name, time, score }, ...] } (top 10, fast->slow)
+//   POST /api/leaderboard {nickname, score, timeMs} -> { ok: true, top: [...] }        (best-time, then top)
+//
+// Note the fresh key namespace (pj:lb:*): the previous score-only leaderboard lived under
+// "pj:leaderboard" and has no time field, so we start a clean board rather than mix the two.
 //
 // Provision the store in the Vercel dashboard (Storage -> Marketplace -> Redis) and link it to
 // this project; it injects the credentials as env vars. We read either the Upstash-native names
 // or the legacy KV ones so it keeps working across integration versions. Without them the
 // endpoint replies 503 and the client silently hides the leaderboard (the game still plays).
 
-const KEY = "pj:leaderboard";
+const KEY_TIME = "pj:lb:time"; // sorted set: nickname -> best net time (ms), ranked ascending
+const KEY_SCORE = "pj:lb:score"; // hash: nickname -> score of that best-time run
 const REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
 const REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
+
+const MAX_TIME_MS = 24 * 60 * 60 * 1000; // 24h upper bound — reject nonsense / overflow times
 
 // Send one Redis command as a JSON array to the REST root (avoids URL-encoding the member).
 async function redis(command) {
@@ -31,14 +45,19 @@ async function redis(command) {
   return data.result;
 }
 
-// ZREVRANGE returns a flat [member, score, member, score, ...]; fold it into objects.
+// The top 10 fastest runs, each paired with the score it earned. ZRANGE (ascending) returns a
+// flat [member, time, member, time, ...]; then one HMGET fetches every score in a single round-trip.
 async function top10() {
-  const flat = (await redis(["ZREVRANGE", KEY, "0", "9", "WITHSCORES"])) || [];
-  const out = [];
+  const flat = (await redis(["ZRANGE", KEY_TIME, "0", "9", "WITHSCORES"])) || [];
+  const names = [];
+  const times = [];
   for (let i = 0; i < flat.length; i += 2) {
-    out.push({ name: flat[i], score: Number(flat[i + 1]) || 0 });
+    names.push(flat[i]);
+    times.push(Number(flat[i + 1]) || 0);
   }
-  return out;
+  // HMGET errors on an empty field list, so only ask when there's at least one name.
+  const scores = names.length ? (await redis(["HMGET", KEY_SCORE, ...names])) || [] : [];
+  return names.map((name, i) => ({ name, time: times[i], score: Number(scores[i]) || 0 }));
 }
 
 // Sanitise a player nickname. A Unicode whitelist (letters/digits/space + a little
@@ -75,17 +94,26 @@ module.exports = async (req, res) => {
       body = body || {};
       const name = cleanNick(body.nickname);
       const score = Math.floor(Number(body.score));
+      const timeMs = Math.round(Number(body.timeMs));
       if (!name) {
         res.status(400).json({ error: "nickname mancante" });
+        return;
+      }
+      if (!Number.isFinite(timeMs) || timeMs <= 0 || timeMs > MAX_TIME_MS) {
+        res.status(400).json({ error: "tempo non valido" });
         return;
       }
       if (!Number.isFinite(score) || score < 0 || score > 1e7) {
         res.status(400).json({ error: "punteggio non valido" });
         return;
       }
-      // Keep the best score per nickname: GT only raises an existing entry, but still adds a
-      // brand-new one. (Same nickname from two players overwrites — acceptable for this scope.)
-      await redis(["ZADD", KEY, "GT", String(score), name]);
+      // Keep the best (fastest) time per nickname. LT only lowers an existing entry's time but
+      // still inserts a brand-new one; CH makes ZADD report whether the entry changed (added or
+      // improved). Only when it did do we overwrite the stored score, so the shown points always
+      // belong to that best-time run. (Same nickname from two players competes for the fastest
+      // time — acceptable for this scope.)
+      const changed = await redis(["ZADD", KEY_TIME, "LT", "CH", String(timeMs), name]);
+      if (changed) await redis(["HSET", KEY_SCORE, name, String(score)]);
       res.status(200).json({ ok: true, top: await top10() });
       return;
     }

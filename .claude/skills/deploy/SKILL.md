@@ -1,9 +1,9 @@
 ---
 name: deploy
-description: Deploy The Princess Journey to Vercel production (or a preview) and verify the live site. Use when asked to deploy, ship, publish, or push the game live.
+description: Deploy Un dono per Anna to Vercel production (or a preview) and verify the live site. Use when asked to deploy, ship, publish, or push the game live.
 ---
 
-# Deploy The Princess Journey (Vercel)
+# Deploy Un dono per Anna (Vercel)
 
 No build step — Vercel serves the static files. The project is already linked (`.vercel/`).
 
