@@ -184,6 +184,16 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   (Vercel serverless → Upstash Redis). `src/leaderboard.js` swallows every error to `null`, so the
   finale/menu still work with **no `/api`** — exactly the Playwright setup (`tools/serve.py` serves
   statics only). Keep that graceful fallback or the test suite breaks.
+- **Leaderboard is a TIME-ATTACK board:** it ranks by the **fastest net play time** to finish the
+  six levels, not by score. The net timer lives in `state.js` (`pj.runTime` ms — accumulated in
+  `game.js` only during active play, so pauses stop it via the paused tree and deaths via a `!dead`
+  guard; wiped by `resetRun` like the score). The finale submits `{nickname, score, timeMs}`; the
+  API stores it in a ZSET **`pj:lb:time`** (`ZADD LT CH` keeps each nickname's best/lowest time,
+  read back ascending) plus a companion HASH **`pj:lb:score`** (the score of that best-time run,
+  `HSET` only when the time improved). This **replaced** the old score-only `pj:leaderboard` key, so
+  the pre-existing global scores are orphaned (a fresh board). To switch back to score-primary
+  ranking, see the alternative documented in `api/leaderboard.js`'s header. A live `M:SS` HUD timer
+  (left column, `src/format.js` `formatDuration`) and the finale/receipt show the same value.
 - **Primitive vs pixel-art world objects:** the **star** (`*`) and **feather** (`+`) are still
   drawn from Kaplay primitives in `build.js` (a polygon + halo) — no `npm run gen`, no
   `ASSETS.sprites` entry. The **heart** (`H`) and **hopper/Rospo** (`h`) USED to be primitives too
