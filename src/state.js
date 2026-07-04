@@ -111,6 +111,11 @@ export function getRunTime() {
 // Accumulate elapsed play time. `dtSeconds` is Kaplay's frame delta (k.dt()).
 export function addRunTime(dtSeconds) {
   if (!(dtSeconds > 0)) return runTimeMs; // ignore NaN / non-positive deltas
+  // Belt-and-suspenders: reject an anomalously large single delta. Kaplay already clamps its
+  // frame delta to 0.25s and skips the first post-resume frame, and src/backgroundFreeze.js
+  // freezes the tree while backgrounded — so a >0.5s delta means something abnormal (a stall,
+  // a debugger pause) and must never inject a multi-second jump into the time-attack clock.
+  if (dtSeconds > 0.5) return runTimeMs;
   runTimeMs += dtSeconds * 1000;
   const sec = Math.floor(runTimeMs / 1000);
   if (sec !== lastPersistedSec) {

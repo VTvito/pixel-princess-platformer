@@ -53,6 +53,25 @@ npm run deploy               # prod deploy to Vercel (reads VERCEL_TOKEN from gi
   pass (~300ms) for iOS's settling. **Keep this on resume** or the bands-on-reopen bug returns.
   Emulation can't reproduce the WebKit latch (`tools/test/mobile.mjs` only guards that the resync
   runs clean + leaves the canvas full-viewport) — confirm the real fix on a physical iPhone.
+- **Background = idle the whole PWA (`src/backgroundFreeze.js`, installed in `src/main.js`):** an
+  installed iOS PWA kept counting in **Screen Time ("Tempo di utilizzo") for HOURS** while
+  backgrounded (phantom 7h+ "usage" + battery drain), and the time-attack clock crept up with it.
+  Cause: nothing reacted to `visibilitychange`→hidden. `src/audioUnlock.js` sets
+  `navigator.audioSession.type = "playback"` (needed so iOS doesn't route the game to the silent
+  ambient category), and a **live "playback" AudioContext is what keeps iOS treating the PWA as an
+  active media session** — the app stays "running" off-screen, its rAF loop stays warm, and every
+  `onUpdate` keeps ticking (incl. `addRunTime(k.dt())` in `game.js`). Fix: on hidden, **freeze the
+  tree** (`k.getTreeRoot().paused = true` — the SAME flag the pause overlay uses, so all `onUpdate`
+  stop → run timer + simulation halt) **and `k.audioCtx.suspend()`** (releases the media session so
+  iOS can suspend the whole app). On visible, restore the **snapshotted** prior `paused` — so a
+  **manually-paused** game stays paused (never unpause it, never leak a wrong state into a scene;
+  see "Pause = global freeze"). **Audio resume needs nothing here:** `audioUnlock.js` already
+  re-resumes on visible + next gesture and restarts the bgm on the suspended→running edge — keep it.
+  Don't touch the frame cap (a paused tree makes stray background frames cheap). Also: `addRunTime`
+  (`state.js`) now **rejects deltas > 0.5s** as a belt-and-suspenders against any stray big dt.
+  Emulation can't reproduce iOS's media-session/Screen-Time accounting — `tools/test/mobile.mjs`
+  asserts the mechanism (tree freezes, ctx suspends, clock stops, manual pause survives); confirm
+  the actual Screen-Time win on a physical iPhone.
 - **Mobile render density:** touch devices use `pixelDensity: 1` (`src/kaplayCtx.js`); desktop
   keeps `min(dpr, 2)`. On a 3× iPhone the old 2× backbuffer was ~4× the fill-rate and made the
   game stutter — density 1 is smooth and, on nearest-neighbour pixel art, visually near-identical.

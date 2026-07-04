@@ -154,6 +154,66 @@ try {
     JSON.stringify({ jump: inGame.jump, dpad: inGame.dpad }),
   );
 
+  // --- Background freeze (src/backgroundFreeze.js): the iOS "phantom Screen-Time usage" fix.
+  // On background we freeze the game tree + suspend audio so iOS suspends the app (no hours-long
+  // "in use", no battery drain) and the time-attack clock stops. Emulation can't reproduce iOS's
+  // media-session / Screen-Time accounting — but here the tab is TRULY visible, so rAF keeps
+  // running and the ONLY thing that can stop the clock is our freeze. That makes this a faithful
+  // mechanism test: freeze fails ⇒ the clock keeps ticking and the assertion catches it. ---
+  const bg = await page.evaluate(async () => {
+    const k = window.__pj.k;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const setVis = (v) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => v });
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => v === "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const t0 = window.__pj.getRunTime();
+    setVis("hidden"); // → background: freeze() runs synchronously on the dispatch
+    // suspend() is async — poll briefly for the context to settle into "suspended".
+    let audio = k.audioCtx ? k.audioCtx.state : "no-ctx";
+    for (let i = 0; i < 20 && k.audioCtx && audio !== "suspended"; i++) {
+      await sleep(25);
+      audio = k.audioCtx.state;
+    }
+    const frozenPaused = k.getTreeRoot().paused;
+    await sleep(500); // if the freeze failed, rAF would accrue ~500ms into the run clock here
+    const dtHidden = window.__pj.getRunTime() - t0;
+    setVis("visible"); // → foreground: thaw() restores the prior (unpaused) state
+    await sleep(120);
+    const resumedPaused = k.getTreeRoot().paused;
+    return { frozenPaused, audio, dtHidden, resumedPaused };
+  });
+  check("background freezes the game tree", bg.frozenPaused === true, JSON.stringify(bg));
+  check("background suspends the audio context", bg.audio === "suspended", `audio=${bg.audio}`);
+  check("run clock frozen while backgrounded", bg.dtHidden < 100, `Δ=${Math.round(bg.dtHidden)}ms`);
+  check("foreground restores active play (unpaused)", bg.resumedPaused === false, JSON.stringify(bg));
+
+  // Manual pause must SURVIVE a background cycle (the "Pause = global freeze" invariant): a game
+  // the player paused stays paused on return — we must never unpause it. Leaves the game resumed.
+  const mp = await page.evaluate(async () => {
+    const k = window.__pj.k;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const setVis = (v) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => v });
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => v === "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    document.getElementById("pause-toggle").click(); // manual pause (tree frozen + DOM overlay)
+    await sleep(50);
+    const beforePaused = k.getTreeRoot().paused;
+    setVis("hidden");
+    await sleep(120);
+    setVis("visible");
+    await sleep(120);
+    const afterPaused = k.getTreeRoot().paused;
+    document.getElementById("pause-toggle").click(); // resume → clean state for the screenshot
+    await sleep(80);
+    return { beforePaused, afterPaused, finalPaused: k.getTreeRoot().paused };
+  });
+  check("manual pause set (control)", mp.beforePaused === true, JSON.stringify(mp));
+  check("manual pause survives a background cycle", mp.afterPaused === true, JSON.stringify(mp));
+
   await page.screenshot({ path: SHOT_GAME });
 
   // --- Report ---

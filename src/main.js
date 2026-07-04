@@ -3,10 +3,12 @@
 
 import { k } from "./kaplayCtx.js";
 import { loadAssets } from "./assets.js";
+import { getRunTime } from "./state.js";
 import { bindTouchButtons, getInput } from "./controls.js";
 import { bindAudioToggle } from "./ui/audioToggle.js";
 import { installAudioUnlock } from "./audioUnlock.js";
 import { installViewportResync } from "./viewportResync.js";
+import { installBackgroundFreeze } from "./backgroundFreeze.js";
 import { bindInstallHint } from "./ui/installHint.js";
 import { bindAudioDebug } from "./ui/audioDebug.js";
 import { bindFpsOverlay } from "./ui/fpsOverlay.js";
@@ -32,6 +34,11 @@ installAudioUnlock();
 // landscape Kaplay sometimes keeps a stale canvas size (only two colour bands show, the menu
 // never loads) and a manual rotation was the only recovery. See src/viewportResync.js.
 installViewportResync();
+
+// Idle the whole PWA while it's backgrounded: freeze the game tree + suspend audio on
+// visibilitychange→hidden so iOS actually suspends the app (no phantom Screen-Time "usage"
+// racking up hours, no battery drain, and the time-attack clock stops). See src/backgroundFreeze.js.
+installBackgroundFreeze();
 
 // "Add to Home" hint on iOS Safari (true fullscreen lives only in the installed PWA).
 bindInstallHint();
@@ -94,7 +101,8 @@ if (
 
 // Dev-only test handle (localhost). Lets automated tests/dev tools introspect the
 // engine AND drive it: `input` is the live virtual-input object (set .left/.right/.jump
-// to play headlessly without synthetic key events). Never attached on a real deployment.
+// to play headlessly without synthetic key events); `getRunTime` reads the time-attack clock
+// so the background-freeze test can assert it stops. Never attached on a real deployment.
 if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-  window.__pj = { k, input: getInput() };
+  window.__pj = { k, input: getInput(), getRunTime };
 }
