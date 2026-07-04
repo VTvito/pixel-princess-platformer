@@ -1,4 +1,4 @@
-# CI for Un dono per Anna — a no-build static game, so there's nothing to compile.
+# CI for Pixel Princess Platformer — a no-build static game, so there's nothing to compile.
 # Two jobs:
 #   • syntax  — parses every ES module with `node --check`. Fast, deterministic; catches the
 #               realistic breakage for this repo (a typo / bad edit in a shipped module).

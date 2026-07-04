@@ -1,6 +1,6 @@
 ---
 name: regen-assets
-description: Regenerate all sprites, tiles, backgrounds and audio for Un dono per Anna from the pixel-art pipeline. Use when asked to regenerate, rebuild, or refresh the game's generated assets.
+description: Regenerate all sprites, tiles, backgrounds and audio for Pixel Princess Platformer from the pixel-art pipeline. Use when asked to regenerate, rebuild, or refresh the game's generated assets.
 ---
 
 # Regenerate assets

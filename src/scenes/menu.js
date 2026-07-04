@@ -82,7 +82,7 @@ export function registerMenuScene() {
 
     // Title (cream so it reads on the dusk backdrop).
     k.add([
-      k.text("Un dono per Anna", { size: 64 }),
+      k.text("Pixel Princess Platformer", { size: 48 }),
       k.pos(GAME_W / 2, 110),
       k.anchor("center"),
       k.color(...PALETTE.cream),

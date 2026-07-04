@@ -14,7 +14,7 @@ export function registerLoadingScene() {
     k.add([k.rect(GAME_W, GAME_H), k.pos(0, 0), k.color(...PALETTE.deepBlue)]);
 
     k.add([
-      k.text("Un dono per Anna", { size: 56 }),
+      k.text("Pixel Princess Platformer", { size: 44 }),
       k.pos(GAME_W / 2, GAME_H / 2 - 60),
       k.anchor("center"),
       k.color(...PALETTE.gold),

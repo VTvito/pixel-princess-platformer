@@ -1,4 +1,4 @@
-// index.mjs — asset pipeline orchestrator for "Un dono per Anna".
+// index.mjs — asset pipeline orchestrator for "Pixel Princess Platformer".
 // Run: `npm run gen` (or `node tools/gen/index.mjs`). Regenerates every game asset
 // (16-bit pixel art + synthesized audio) deterministically — same input, same bytes.
 //

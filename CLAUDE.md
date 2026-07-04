@@ -1,4 +1,4 @@
-# CLAUDE.md — Un dono per Anna (già "The Princess Journey")
+# CLAUDE.md — Pixel Princess Platformer
 
 Quick reference for working in this repo. The user-facing guide is `README.md`; this
 file is the agent/contributor playbook.

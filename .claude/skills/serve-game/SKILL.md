@@ -1,9 +1,9 @@
 ---
 name: serve-game
-description: Launch the local dev server for Un dono per Anna (the Kaplay browser platformer in this repo) so it can be played in a browser or driven with Playwright. Use when asked to run, start, serve, or open the game, or before browser-testing it.
+description: Launch the local dev server for Pixel Princess Platformer (the Kaplay browser platformer in this repo) so it can be played in a browser or driven with Playwright. Use when asked to run, start, serve, or open the game, or before browser-testing it.
 ---
 
-# Serve Un dono per Anna locally
+# Serve Pixel Princess Platformer locally
 
 This is a **no-build** browser game (Kaplay loaded from a CDN). Running it needs only a static
 file server that sends correct ES-module MIME types — there is nothing to install or compile.

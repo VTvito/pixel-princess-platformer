@@ -1,6 +1,6 @@
-# 👑 Un dono per Anna
+# 👑 Pixel Princess Platformer
 
-![Un dono per Anna — gameplay](assets/screenshot.png)
+![Pixel Princess Platformer — gameplay](assets/screenshot.png)
 
 **[▶ Play it live](https://gameforprincess.vercel.app)** · License: MIT · Built with [Kaplay](https://kaplayjs.com/) — no build step
 

@@ -1,4 +1,4 @@
-// Standalone browser smoke test for Un dono per Anna.
+// Standalone browser smoke test for Pixel Princess Platformer.
 //
 // Launches the installed Microsoft Edge via playwright-core (NO browser download)
 // and verifies the game boots cleanly to the menu with no console/page errors —
