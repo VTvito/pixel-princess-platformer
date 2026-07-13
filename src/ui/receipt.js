@@ -39,8 +39,10 @@ function els() {
  * @param {number} run       this adventure's Coccoline bill
  * @param {number} lifetime  the lifetime grand total
  * @param {number} timeMs    the run's net play time in ms (time-attack "risultato finale")
- * @param {() => void} [onClose]  runs after the player taps "Chiudi" (the finale uses it to chain
- *   the leaderboard popup). NOT fired by the defensive hideReceipt() calls from other scenes.
+ * @param {() => void} [onClose]  runs after the player taps "Chiudi". NOT fired by the defensive
+ *   hideReceipt() calls from other scenes. The finale passes nothing: the receipt is now the LAST
+ *   step of the closing sequence (the leaderboard invitation comes before it), so there is nothing
+ *   left to chain.
  */
 export function showReceipt(run, lifetime, timeMs, onClose) {
   els();

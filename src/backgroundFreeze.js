@@ -58,6 +58,13 @@ function thaw() {
  * Wire the background freeze/thaw. Call once at startup (from main.js). Uses visibilitychange —
  * the reliable foreground/background signal on an iOS standalone PWA — mirroring the existing
  * audioUnlock / viewportResync resume listeners.
+ *
+ * Thaw also hangs off `pageshow` and `focus`. This is deliberate belt-and-braces: freeze() holds
+ * the WHOLE tree paused, so a `hidden` whose matching `visible` never arrives (iOS can drop it
+ * across an app-switch or an orientation transition) would leave the game permanently frozen — the
+ * screen locked up until a reload. Those two extra signals give the thaw a second and third chance.
+ * thaw() is idempotent (`frozenByBackground` gates it) and restores the SNAPSHOT, so a manually
+ * paused game still stays paused — the invariant in CLAUDE.md holds.
  */
 export function installBackgroundFreeze() {
   if (installed) return;
@@ -67,4 +74,6 @@ export function installBackgroundFreeze() {
     if (document.visibilityState === "hidden") freeze();
     else thaw();
   });
+  window.addEventListener("pageshow", thaw);
+  window.addEventListener("focus", thaw);
 }

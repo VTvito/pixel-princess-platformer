@@ -35,7 +35,8 @@
       content="https://gameforprincess.vercel.app/assets/screenshot.png"
     />
     <!-- PWA: installable to the home screen (manifest for Android/desktop; iOS Safari
-         ignores manifest icons, so the 180×180 apple-touch-icon link is required). -->
+         ignores manifest icons, so the apple-touch-icon link is required — it carries no `sizes`,
+         so any square works; tools/gen emits it at 192×192 alongside the manifest icons). -->
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -75,9 +76,10 @@
       <button id="btn-jump" type="button" aria-label="Salto">⤴</button>
     </div>
 
-    <!-- Music + SFX toggles (top-right). Independent buses; wired in src/ui/audioToggle.js. -->
-    <button id="music-toggle" type="button" aria-label="Disattiva musica">🎵</button>
-    <button id="audio-toggle" type="button" aria-label="Disattiva effetti">🔊</button>
+    <!-- Single audio toggle (top-right): one tap silences BOTH buses (music + effects) and the
+         glyph flips to the slashed speaker, so "off" is unmistakable. Wired in
+         src/ui/audioToggle.js; the per-bus volume sliders still live in the settings overlay. -->
+    <button id="audio-toggle" type="button" aria-label="Disattiva audio">🔊</button>
 
     <!-- Pause button (top-left), shown only during gameplay (body.playing). Works on
          keyboard (ESC) and touch alike; wired in src/scenes/game.js. -->
@@ -168,11 +170,16 @@
     </div>
 
     <!-- Global leaderboard overlay. DOM; shown by src/ui/leaderboard.js — submit mode from the
-         finale, read-only standings from the menu. Talks to /api/leaderboard (Vercel). -->
+         finale (where #lb-invite turns it into the closing "enter the board" step), read-only
+         standings from the menu. Talks to /api/leaderboard (Vercel). Every finished run is its own
+         row, so the list is paged (#lb-pager). -->
     <div id="leaderboard-overlay" class="overlay" hidden>
       <div class="overlay-card leaderboard-card">
         <p class="pause-title">Classifica</p>
         <div id="lb-form">
+          <p id="lb-invite" class="lb-invite" hidden>
+            🏆 Hai finito il viaggio!<br />Metti il tuo tempo in classifica
+          </p>
           <p class="lb-prompt">Il tuo punteggio: <span id="lb-score">0</span> ★</p>
           <p class="lb-prompt">Il tuo tempo: <span id="lb-time">0:00</span> ⏱</p>
           <input
@@ -187,6 +194,11 @@
           <button id="lb-submit" type="button" class="ui-btn">Invia in classifica</button>
         </div>
         <ol id="lb-list" class="lb-list"></ol>
+        <div id="lb-pager" class="lb-pager" hidden>
+          <button id="lb-prev" type="button" class="lb-page-btn" aria-label="Pagina precedente">‹ Prec</button>
+          <span id="lb-range" class="lb-range"></span>
+          <button id="lb-next" type="button" class="lb-page-btn" aria-label="Pagina successiva">Succ ›</button>
+        </div>
         <p id="lb-status" class="lb-status"></p>
         <button id="lb-close" type="button" class="ui-btn ghost-btn">Chiudi</button>
       </div>

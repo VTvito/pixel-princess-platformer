@@ -23,7 +23,13 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await routeVendorKaplay(page);
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(`console.error: ${m.text()}`);
+    if (m.type() !== "error") return;
+    // tools/serve.py serves the statics only — there is no /api here, so the finale's leaderboard
+    // fetch 404s by design and the browser logs it. That IS the graceful-degradation path we want
+    // (src/leaderboard.js swallows it to null and the overlay says "non disponibile"), so it must
+    // not fail the run. Every other console error still does.
+    if (m.location()?.url?.includes("/api/leaderboard")) return;
+    errors.push(`console.error: ${m.text()}`);
   });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
@@ -38,32 +44,31 @@ try {
   );
   check("boots to menu", true);
 
-  // --- §4 Audio: independent Music + SFX buses flip, reflect their icon/state, persist ---
-  await page.click("#audio-toggle"); // SFX → off
-  const s1 = await page.evaluate(() => ({
-    icon: document.getElementById("audio-toggle").textContent,
-    ls: localStorage.getItem("pj.sfx"),
-  }));
-  check("sfx toggle → off", s1.icon.includes("🔇") && s1.ls === "0", JSON.stringify(s1));
-  await page.click("#audio-toggle"); // SFX → on
-  const s2 = await page.evaluate(() => ({
-    icon: document.getElementById("audio-toggle").textContent,
-    ls: localStorage.getItem("pj.sfx"),
-  }));
-  check("sfx toggle → on", s2.icon.includes("🔊") && s2.ls === "1", JSON.stringify(s2));
+  // --- §4 Audio: ONE toggle mutes BOTH buses (music + sfx), flips to the slashed speaker, persists.
+  // (It used to be two buttons — 🎵 and 🔊 — whose only "off" cue was a dimmed glyph.) ---
+  const audioState = () =>
+    page.evaluate(() => ({
+      icon: document.getElementById("audio-toggle").textContent,
+      muted: document.getElementById("audio-toggle").classList.contains("is-muted"),
+      sfx: localStorage.getItem("pj.sfx"),
+      music: localStorage.getItem("pj.music"),
+    }));
 
-  await page.click("#music-toggle"); // Music → off (🎵 dims; glyph stays the same)
-  const mu1 = await page.evaluate(() => ({
-    muted: document.getElementById("music-toggle").classList.contains("is-muted"),
-    ls: localStorage.getItem("pj.music"),
-  }));
-  check("music toggle → off", mu1.muted && mu1.ls === "0", JSON.stringify(mu1));
-  await page.click("#music-toggle"); // Music → on
-  const mu2 = await page.evaluate(() => ({
-    muted: document.getElementById("music-toggle").classList.contains("is-muted"),
-    ls: localStorage.getItem("pj.music"),
-  }));
-  check("music toggle → on", !mu2.muted && mu2.ls === "1", JSON.stringify(mu2));
+  await page.click("#audio-toggle"); // both buses → off
+  const a1 = await audioState();
+  check(
+    "audio toggle → off (both buses)",
+    a1.icon.includes("🔇") && a1.muted && a1.sfx === "0" && a1.music === "0",
+    JSON.stringify(a1),
+  );
+  await page.click("#audio-toggle"); // both buses → on
+  const a2 = await audioState();
+  check(
+    "audio toggle → on (both buses)",
+    a2.icon.includes("🔊") && !a2.muted && a2.sfx === "1" && a2.music === "1",
+    JSON.stringify(a2),
+  );
+  check("single audio button (no separate music toggle)", (await page.$("#music-toggle")) === null);
 
   // --- Enter gameplay on Livello 2 (it has crabs — needed for the stomp checks below).
   // state.js reads localStorage at module init, so pin the level and reload first. ---
@@ -423,8 +428,29 @@ try {
   check("armored swooper takes two stomps", armored.ok, armored.why || JSON.stringify(armored));
   check("armored swooper enrages when wounded", !!armored.enraged, JSON.stringify(armored));
 
-  // --- §2 Finale receipt: shows the running debt ---
+  // --- §2 Finale closing sequence: the CLASSIFICA invitation comes first (it's the step the
+  // player must not miss), and only once she's dealt with it — sent her time or tapped "Salta" —
+  // does the Coccoline receipt follow. Offline (no /api, which is exactly this static server) the
+  // board degrades to a "non disponibile" message, so the chain must still make it through. ---
   await page.evaluate(() => window.__pj.k.go("finale"));
+  await page.waitForFunction(() => !document.getElementById("leaderboard-overlay").hidden, null, {
+    timeout: T,
+    polling: 100,
+  });
+  const inviteState = await page.evaluate(() => ({
+    invite: !document.getElementById("lb-invite").hidden,
+    form: !document.getElementById("lb-form").hidden,
+    close: document.getElementById("lb-close").textContent,
+    receiptHidden: document.getElementById("receipt-overlay").hidden,
+  }));
+  check(
+    "finale invites the leaderboard first",
+    inviteState.invite && inviteState.form && inviteState.close === "Salta" && inviteState.receiptHidden,
+    JSON.stringify(inviteState),
+  );
+
+  // "Salta" is the only way past it without submitting — and it must hand off to the receipt.
+  await page.click("#lb-close");
   await page.waitForFunction(() => !document.getElementById("receipt-overlay").hidden, null, {
     timeout: T,
     polling: 100,

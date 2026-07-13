@@ -6,31 +6,43 @@
 // works on the free Hobby plan) over its REST API.
 //
 // Time-attack model — rank by the FASTEST net play time to finish the six levels; the run's
-// score rides along as a secondary stat:
-//   • a sorted set  KEY_TIME  (pj:lb:time)  member = nickname, score = net time in ms →
-//     read back ascending (ZRANGE) so the quickest run is #1.
-//   • a hash        KEY_SCORE (pj:lb:score) field  = nickname, value = the score of that
-//     best-time run, so the standings can show the points alongside the time.
-//   We keep each nickname's BEST (lowest) time via `ZADD LT` and only overwrite the stored score
-//   when the time actually improved (the `CH` flag tells us whether it did).
+// score rides along as a secondary stat. Every SUBMITTED RUN IS ITS OWN ROW: the board is a
+// history, not a per-player best. (It used to key the sorted set by the bare nickname with
+// `ZADD LT`, so a second run under the same name silently REPLACED the first and the old
+// record vanished — the whole point of this rewrite.)
+//   • a counter     KEY_SEQ   (pj:lb:seq)   an INCR per submission → a unique run id.
+//   • a sorted set  KEY_TIME  (pj:lb:time)  member = "<id>:<nickname>", score = net time in ms →
+//     read back ascending (ZRANGE) so the quickest run is #1. The id makes the member unique,
+//     so the same nickname can legitimately appear many times.
+//   • a hash        KEY_SCORE (pj:lb:score) field = that same member, value = the run's score.
 //
-//   GET  /api/leaderboard                      -> { top: [{ name, time, score }, ...] } (top 10, fast->slow)
-//   POST /api/leaderboard {nickname, score, timeMs} -> { ok: true, top: [...] }        (best-time, then top)
+// Because rows now accumulate, the board is PAGED and TRIMMED:
+//   GET  /api/leaderboard?offset=0&limit=10  -> { rows: [{id, name, time, score}, ...], total, offset, limit }
+//        (no query string → the first 10, fastest first)
+//   POST /api/leaderboard {nickname, score, timeMs}
+//        -> { ok: true, id, rank, total, rows, offset, limit }   (rows = the page CONTAINING the
+//           new record, so the client can open straight on it instead of always showing the top)
+// Only the MAX_ROWS fastest runs are kept (ZREMRANGEBYRANK), and the dropped members' score
+// fields are HDEL'd first so the hash never accumulates orphans.
 //
-// Note the fresh key namespace (pj:lb:*): the previous score-only leaderboard lived under
-// "pj:leaderboard" and has no time field, so we start a clean board rather than mix the two.
+// Legacy rows: the pre-rewrite entries are bare nicknames with no "<id>:" prefix. parseMember()
+// handles both shapes, so the existing board keeps rendering instead of being wiped.
 //
 // Provision the store in the Vercel dashboard (Storage -> Marketplace -> Redis) and link it to
 // this project; it injects the credentials as env vars. We read either the Upstash-native names
 // or the legacy KV ones so it keeps working across integration versions. Without them the
 // endpoint replies 503 and the client silently hides the leaderboard (the game still plays).
 
-const KEY_TIME = "pj:lb:time"; // sorted set: nickname -> best net time (ms), ranked ascending
-const KEY_SCORE = "pj:lb:score"; // hash: nickname -> score of that best-time run
+const KEY_TIME = "pj:lb:time"; // sorted set: "<id>:<nickname>" -> that run's net time (ms), ascending
+const KEY_SCORE = "pj:lb:score"; // hash: same member -> that run's score
+const KEY_SEQ = "pj:lb:seq"; // counter: hands out a unique id per submitted run
 const REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
 const REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
 
 const MAX_TIME_MS = 24 * 60 * 60 * 1000; // 24h upper bound — reject nonsense / overflow times
+const MAX_ROWS = 200; // how many runs the board remembers (the rest is trimmed away)
+const DEFAULT_LIMIT = 10; // one page
+const MAX_LIMIT = 50; // cap a caller-supplied page size
 
 // Send one Redis command as a JSON array to the REST root (avoids URL-encoding the member).
 async function redis(command) {
@@ -45,24 +57,40 @@ async function redis(command) {
   return data.result;
 }
 
-// The top 10 fastest runs, each paired with the score it earned. ZRANGE (ascending) returns a
-// flat [member, time, member, time, ...]; then one HMGET fetches every score in a single round-trip.
-async function top10() {
-  const flat = (await redis(["ZRANGE", KEY_TIME, "0", "9", "WITHSCORES"])) || [];
-  const names = [];
+// Split a sorted-set member back into {id, name}. New members are "<id>:<nickname>"; the ":" is a
+// safe separator because cleanNick() below never lets one into a nickname. A member WITHOUT a ":"
+// is a legacy (pre-history) row — the whole thing is the nickname and it has no id.
+function parseMember(member) {
+  const cut = String(member).indexOf(":");
+  if (cut < 0) return { id: null, name: String(member) };
+  return { id: Number(member.slice(0, cut)) || null, name: member.slice(cut + 1) };
+}
+
+// One page of the board, fastest first, plus the total row count so the client can page.
+// ZRANGE (ascending) returns a flat [member, time, member, time, ...]; a single HMGET then fetches
+// every score in one round-trip. `rank` is GLOBAL (offset-based), so page 3 shows 21…30, not 1…10.
+async function page(offset, limit) {
+  const total = Number(await redis(["ZCARD", KEY_TIME])) || 0;
+  const flat = (await redis(["ZRANGE", KEY_TIME, String(offset), String(offset + limit - 1), "WITHSCORES"])) || [];
+  const members = [];
   const times = [];
   for (let i = 0; i < flat.length; i += 2) {
-    names.push(flat[i]);
+    members.push(flat[i]);
     times.push(Number(flat[i + 1]) || 0);
   }
-  // HMGET errors on an empty field list, so only ask when there's at least one name.
-  const scores = names.length ? (await redis(["HMGET", KEY_SCORE, ...names])) || [] : [];
-  return names.map((name, i) => ({ name, time: times[i], score: Number(scores[i]) || 0 }));
+  // HMGET errors on an empty field list, so only ask when there's at least one member.
+  const scores = members.length ? (await redis(["HMGET", KEY_SCORE, ...members])) || [] : [];
+  const rows = members.map((member, i) => {
+    const { id, name } = parseMember(member);
+    return { id, name, time: times[i], score: Number(scores[i]) || 0, rank: offset + i + 1 };
+  });
+  return { rows, total, offset, limit };
 }
 
 // Sanitise a player nickname. A Unicode whitelist (letters/digits/space + a little
 // punctuation) keeps real names from every language while dropping control chars and emoji —
-// and needs no literal control bytes in this source file. Then collapse whitespace + cap length.
+// and needs no literal control bytes in this source file. Note it also drops ":", which is what
+// makes it safe as the id separator in a sorted-set member. Then collapse whitespace + cap length.
 function cleanNick(raw) {
   if (typeof raw !== "string") return "";
   return raw
@@ -72,6 +100,25 @@ function cleanNick(raw) {
     .slice(0, 16);
 }
 
+// Read + clamp the paging query. Anything malformed falls back to the first page.
+function readPaging(req) {
+  const q = (req.query || {});
+  const rawOffset = parseInt(q.offset, 10);
+  const rawLimit = parseInt(q.limit, 10);
+  const limit = Number.isFinite(rawLimit) ? Math.min(MAX_LIMIT, Math.max(1, rawLimit)) : DEFAULT_LIMIT;
+  const offset = Number.isFinite(rawOffset) ? Math.max(0, rawOffset) : 0;
+  return { offset, limit };
+}
+
+// Drop everything past the MAX_ROWS fastest runs. The hash fields go FIRST (we still need the
+// member names to HDEL them) — otherwise the score hash would grow forever with orphan fields.
+async function trim() {
+  const dropped = (await redis(["ZRANGE", KEY_TIME, String(MAX_ROWS), "-1"])) || [];
+  if (!dropped.length) return;
+  await redis(["HDEL", KEY_SCORE, ...dropped]);
+  await redis(["ZREMRANGEBYRANK", KEY_TIME, String(MAX_ROWS), "-1"]);
+}
+
 module.exports = async (req, res) => {
   if (!REST_URL || !REST_TOKEN) {
     res.status(503).json({ error: "leaderboard non configurata" });
@@ -79,7 +126,8 @@ module.exports = async (req, res) => {
   }
   try {
     if (req.method === "GET") {
-      res.status(200).json({ top: await top10() });
+      const { offset, limit } = readPaging(req);
+      res.status(200).json(await page(offset, limit));
       return;
     }
     if (req.method === "POST") {
@@ -107,14 +155,24 @@ module.exports = async (req, res) => {
         res.status(400).json({ error: "punteggio non valido" });
         return;
       }
-      // Keep the best (fastest) time per nickname. LT only lowers an existing entry's time but
-      // still inserts a brand-new one; CH makes ZADD report whether the entry changed (added or
-      // improved). Only when it did do we overwrite the stored score, so the shown points always
-      // belong to that best-time run. (Same nickname from two players competes for the fastest
-      // time — acceptable for this scope.)
-      const changed = await redis(["ZADD", KEY_TIME, "LT", "CH", String(timeMs), name]);
-      if (changed) await redis(["HSET", KEY_SCORE, name, String(score)]);
-      res.status(200).json({ ok: true, top: await top10() });
+
+      // A fresh id per submission makes the member unique, so this run is ADDED to the history
+      // instead of replacing the player's previous one. Plain ZADD — no LT/CH, nothing to merge.
+      const id = Number(await redis(["INCR", KEY_SEQ]));
+      const member = `${id}:${name}`;
+      await redis(["ZADD", KEY_TIME, String(timeMs), member]);
+      await redis(["HSET", KEY_SCORE, member, String(score)]);
+      await trim();
+
+      // Answer with the page that CONTAINS this run, so the client can land the player on her own
+      // row rather than on the top 10. A run trimmed away (slower than all MAX_ROWS kept) has no
+      // rank — fall back to the first page.
+      const { limit } = readPaging(req);
+      const rankIdx = await redis(["ZRANK", KEY_TIME, member]); // 0-based, or null if trimmed off
+      const idx = Number.isFinite(Number(rankIdx)) && rankIdx !== null ? Number(rankIdx) : null;
+      const offset = idx === null ? 0 : Math.floor(idx / limit) * limit;
+      const body2 = await page(offset, limit);
+      res.status(200).json({ ok: true, id, rank: idx === null ? null : idx + 1, ...body2 });
       return;
     }
     res.status(405).json({ error: "metodo non consentito" });

@@ -1,45 +1,42 @@
-// audioToggle.js — the two top-right toggle buttons for the Music and SFX buses
-// (extended). 🎵 silences the looping background music; 🔊 silences
-// the gameplay sound effects. Each reflects + persists its bus state (src/audio.js) so the
-// choice survives reloads. Bound once at startup (like the touch buttons), so both work on
-// every scene. Markup lives in index.html.
+// audioToggle.js — the ONE top-right audio button.
+//
+// It used to be two (🎵 music + 🔊 effects) with independent buses, and "off" was signalled only
+// by dimming the glyph — hard to read, and two controls where one would do. Now a single button
+// mutes/unmutes BOTH buses together, and "off" is unmistakable: the glyph becomes the slashed
+// speaker 🔇 and the circle turns crimson (style.css `#audio-toggle.is-muted`).
+//
+// The buses themselves (src/audio.js) stay separate — the settings overlay still offers a music
+// and an effects volume slider, and this button never touches those levels, only the on/off flags.
+// So muting and unmuting from here always restores the volumes the player had chosen.
+//
+// Bound once at startup (like the touch buttons), so it works in every scene. Markup: index.html.
 
 import { isMusicOn, isSfxOn, setMusicOn, setSfxOn } from "../audio.js";
 
-let musicBtn = null;
-let sfxBtn = null;
+let btn = null;
 
-function paintMusic() {
-  if (!musicBtn) return;
-  const on = isMusicOn();
-  musicBtn.classList.toggle("is-muted", !on); // dims the 🎵 when off
-  musicBtn.setAttribute("aria-label", on ? "Disattiva musica" : "Attiva musica");
+/** Audio is "on" if EITHER bus is live — so the button always offers the action you'd expect. */
+function isAudioOn() {
+  return isMusicOn() || isSfxOn();
 }
 
-function paintSfx() {
-  if (!sfxBtn) return;
-  const on = isSfxOn();
-  sfxBtn.textContent = on ? "🔊" : "🔇";
-  sfxBtn.classList.toggle("is-muted", !on);
-  sfxBtn.setAttribute("aria-label", on ? "Disattiva effetti" : "Attiva effetti");
+function paint() {
+  if (!btn) return;
+  const on = isAudioOn();
+  btn.textContent = on ? "🔊" : "🔇"; // the slashed speaker IS the "off" state
+  btn.classList.toggle("is-muted", !on);
+  btn.setAttribute("aria-label", on ? "Disattiva audio" : "Attiva audio");
 }
 
-/** Wire both toggles and apply the saved preferences. Call once at startup. */
+/** Wire the toggle and apply the saved preferences. Call once at startup. */
 export function bindAudioToggle() {
-  musicBtn = document.getElementById("music-toggle");
-  sfxBtn = document.getElementById("audio-toggle");
-  paintMusic();
-  paintSfx();
-  if (musicBtn) {
-    musicBtn.addEventListener("click", () => {
-      setMusicOn(!isMusicOn());
-      paintMusic();
-    });
-  }
-  if (sfxBtn) {
-    sfxBtn.addEventListener("click", () => {
-      setSfxOn(!isSfxOn());
-      paintSfx();
-    });
-  }
+  btn = document.getElementById("audio-toggle");
+  paint();
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const next = !isAudioOn(); // one tap moves both buses to the same new state
+    setMusicOn(next); // pushes the gain onto the live bgm handle (no track restart)
+    setSfxOn(next);
+    paint();
+  });
 }

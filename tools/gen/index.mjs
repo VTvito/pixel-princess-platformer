@@ -81,13 +81,19 @@ for (const name of Object.keys(BG_THEMES)) {
   console.log("bg     ->", join("assets", "backgrounds", `${name}_{sky,mid,near}.png`));
 }
 
-// PWA / home-screen icons (manifest.webmanifest + index.html): crown emblem on the
-// gift's blue. Authored at quarter-res like everything else, scaled to exact sizes.
+// PWA / home-screen icons (manifest.webmanifest + index.html): the pixel princess raising the gold
+// crown, on the gift's blue. Authored small and integer-upscaled like everything else, so the
+// native size × scale must hit each target EXACTLY — 64×8=512, 64×3=192, 128×4=512.
+// The apple-touch icon is emitted at 192 too (its <link> declares no `sizes`, and iOS happily
+// scales any square), which is why one 64-native composition covers three of the four files.
+// The maskable one is composed on a bigger canvas (128) around a bigger figure (×3) so the same
+// art occupies a smaller share of the frame — that's how she lands inside Android's safe zone
+// without fractional scaling. See paintAppIcon in characters.mjs.
 const ICONS = [
-  ["apple-touch-icon.png", paintAppIcon(45), 4], // 180×180 — iOS reads only this one
-  ["icon-192.png", paintAppIcon(48), 4],
-  ["icon-512.png", paintAppIcon(64), 8],
-  ["icon-512-maskable.png", paintAppIcon(64, 0.72), 8], // safe-zone emblem for Android
+  ["apple-touch-icon.png", paintAppIcon(64, 2), 3], // 192×192 — the icon iOS reads
+  ["icon-192.png", paintAppIcon(64, 2), 3],
+  ["icon-512.png", paintAppIcon(64, 2), 8],
+  ["icon-512-maskable.png", paintAppIcon(128, 3), 4], // safe-zone framing for Android
 ];
 for (const [file, img, scale] of ICONS) {
   writeFileSync(join(ICONS_DIR, file), encodeScaled(img, scale));

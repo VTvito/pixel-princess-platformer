@@ -13,7 +13,7 @@ import { resetInput } from "../controls.js";
 import { showReceipt, hideReceipt } from "../ui/receipt.js";
 import { hideInsertCoin } from "../ui/insertCoin.js";
 import { hideGameOver } from "../ui/gameOver.js";
-import { openLeaderboard, hideLeaderboard } from "../ui/leaderboard.js";
+import { openLeaderboard, hideLeaderboard, isLeaderboardOpen } from "../ui/leaderboard.js";
 import { hidePause } from "../ui/pauseMenu.js";
 import { hideSettings } from "../ui/settings.js";
 import { fadeToScene } from "../ui/transition.js";
@@ -154,17 +154,19 @@ export function registerFinaleScene() {
       k.setCursor("default");
     });
     const toMenu = () => {
+      // A DOM overlay above the canvas swallows CLICKS but not KEYS: Enter to confirm a nickname,
+      // or Esc, would otherwise fire this and jump to the menu right past the leaderboard step.
+      if (isLeaderboardOpen()) return;
       sfx("select");
       fadeToScene(() => k.go("menu"));
     };
     btn.onClick(toMenu);
     k.onKeyPress(["enter", "space", "escape"], toMenu);
 
-    // Leaderboard entry: a top-right button opens the global classifica (submit mode) with the
-    // journey's final score. Kept out of the centred message/receipt so the heartfelt note
-    // still comes first — the player chooses to enter her name and compare with the world.
-    // Top-LEFT corner: the top-right is occupied by the DOM 🎵/🔊 audio toggles, and the pause
-    // button (top-left) is hidden in this non-playing scene, so the corner is free.
+    // Leaderboard re-entry: a button to re-open the global classifica after the closing sequence
+    // below has already offered it (a run that's already been filed shows as such, so this can't
+    // create a duplicate row). Top-LEFT corner: the top-right is occupied by the DOM audio toggle,
+    // and the pause button (top-left) is hidden in this non-playing scene, so the corner is free.
     const lbBtn = k.add([
       k.rect(248, 56, { radius: 12 }),
       k.pos(148, 52),
@@ -191,17 +193,27 @@ export function registerFinaleScene() {
       openLeaderboard({ score: getScore(), timeMs: getRunTime() });
     });
 
-    // The payoff: the receipt is a full-screen overlay that covers the heartfelt
-    // message, so hold it back long enough to actually READ the journey note first (it used
-    // to pop after 1.4s and bury the message). Closing it ("Chiudi") then auto-opens the
-    // leaderboard (submit mode) so entering the score is an invited step, not a button to hunt
-    // for — like the Coccoline receipt popout. The top-left "★ Classifica" button stays as a
-    // re-open fallback (and the leaderboard degrades gracefully offline — see leaderboard.js).
-    const RECEIPT_DELAY = 10; // s — an unhurried read of the six-chapter message before the receipt
-    k.wait(RECEIPT_DELAY, () =>
-      showReceipt(getCoccolineRun(), getCoccoline(), getRunTime(), () =>
-        openLeaderboard({ score: getScore(), timeMs: getRunTime() }),
-      ),
+    // --- The closing sequence: read → CLASSIFICA → scontrino ---------------------------------
+    // The leaderboard comes FIRST and unmissably. It used to be last (receipt → "Chiudi" → board),
+    // which meant anyone who closed the app on the receipt never saw it at all — the player simply
+    // reported "there's no prompt to enter the leaderboard". Now it is the gate: a modal invitation
+    // she can only leave by sending her time or tapping the small "Salta". Either way `onDone`
+    // chains the Coccoline receipt (with its WhatsApp payoff) behind it, so nothing is lost.
+    //
+    // The delay still lets the heartfelt letter breathe before anything covers it — shorter than
+    // the old 10s, because the letter is no longer the only thing waiting on the player.
+    // Offline the board degrades to a friendly "non disponibile" (see leaderboard.js), so the
+    // chain never dead-ends; the top-left "★ Classifica" button re-opens it (already-sent runs
+    // show as filed instead of offering a duplicate submit).
+    const INVITE_DELAY = 6; // s — enough to read the letter, soon enough to still feel like the payoff
+    const showBill = () => showReceipt(getCoccolineRun(), getCoccoline(), getRunTime());
+    k.wait(INVITE_DELAY, () =>
+      openLeaderboard({
+        score: getScore(),
+        timeMs: getRunTime(),
+        inviteMode: true,
+        onDone: showBill,
+      }),
     );
   });
 }

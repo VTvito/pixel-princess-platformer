@@ -112,6 +112,32 @@ try {
   check("canvas covers viewport after a resume signal", resume.covers, JSON.stringify(resume));
   check("resync releases the inline size back to CSS", resume.inlineLeft === "(cleared)", `inline=${resume.inlineLeft}`);
 
+  // --- (4b) ROTATION resync (src/viewportResync.js): rotating the device used to leave the game
+  // frozen/blank until the player rotated back and forth again — nothing in the app listened for
+  // resize/orientationchange, so a stale letterbox had nobody to correct it. Same honesty caveat as
+  // above: Chromium won't reproduce WebKit's latch, so this asserts the MECHANISM — a real
+  // portrait→landscape round trip leaves the canvas filling the viewport, the inline pin released,
+  // and the world running (not stuck paused). The actual recovery is confirmed on a physical iPhone.
+  await page.setViewportSize({ width: 430, height: 932 }); // → portrait
+  await page.waitForTimeout(700); // debounce (80ms) + the staged settle passes (150/450ms)
+  await page.setViewportSize({ width: 932, height: 430 }); // → back to landscape
+  await page.waitForTimeout(700);
+  const rotated = await page.evaluate(() => {
+    const c = document.getElementById("game");
+    const r = c.getBoundingClientRect();
+    return {
+      covers: Math.abs(r.width - window.innerWidth) <= 2 && Math.abs(r.height - window.innerHeight) <= 2,
+      inlineLeft: c.style.width || "(cleared)",
+      paused: window.__pj.k.getTreeRoot().paused,
+      scene: window.__pj.k.getSceneName(),
+      rect: { w: Math.round(r.width), h: Math.round(r.height) },
+      vp: { w: window.innerWidth, h: window.innerHeight },
+    };
+  });
+  check("canvas re-fits the viewport after a rotation", rotated.covers, JSON.stringify(rotated));
+  check("rotation resync releases the inline size", rotated.inlineLeft === "(cleared)", `inline=${rotated.inlineLeft}`);
+  check("rotation leaves the world running (not stuck)", rotated.paused === false, JSON.stringify(rotated));
+
   // --- (1) Audio unlock on a REAL gesture: a genuine tap fires the window capture listener
   // in src/audioUnlock.js, which resumes k.audioCtx. ---
   await page.touchscreen.tap(466, 215); // centre of the 932×430 viewport — a real touch gesture

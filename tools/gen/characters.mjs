@@ -8,7 +8,7 @@
 // record for the same frame index, so the runtime overlay layers (which mirror the
 // parent's frame each update) are in sync by construction — drift is impossible.
 
-import { newImg, pset, fillRect, fillTrap, blit, outline, lighten } from "./px.mjs";
+import { newImg, pset, fillRect, fillTrap, blit, outline, lighten, upscale } from "./px.mjs";
 import { SHEET } from "../../src/animspec.js";
 
 export const BODY_W = 16;
@@ -261,33 +261,82 @@ export function paintLogo() {
   return img;
 }
 
-// App icon (PWA / apple-touch-icon): the gold crown emblem on the gift's sugar-paper
-// blue, fully opaque (iOS composites black behind transparent icons). `emblem` shrinks
-// the crown for the maskable variant (Android may crop up to ~20% on every side).
-export function paintAppIcon(S, emblem = 1) {
-  const img = newImg(S, S);
-  fillRect(img, 0, 0, S, S, [167, 199, 231]); // sugar-paper blue
-  fillRect(img, 0, Math.round(S * 0.8), S, S, [199, 186, 232]); // lilac ground band
+const GOLD = [212, 175, 55];
+const GOLD_DARK = [168, 134, 36];
+const GEM = [235, 220, 150];
 
-  // Crown drawn on its own transparent layer so outline() can trace it, then blitted.
-  const crown = newImg(S, S);
-  const gold = [212, 175, 55];
-  const goldDark = [168, 134, 36];
-  const gem = [235, 220, 150];
-  const cx = S / 2;
-  const half = S * 0.3 * emblem;
-  const bTop = Math.round(cx + S * 0.02);
-  const bBot = Math.round(bTop + S * 0.14 * emblem);
-  fillRect(crown, cx - half, bTop, cx + half, bBot, gold);
-  fillRect(crown, cx - half, bBot - Math.max(1, Math.round(S * 0.04)), cx + half, bBot, goldDark);
-  const pointTop = bTop - S * 0.2 * emblem;
-  for (const fx of [-0.72, 0, 0.72]) {
-    fillTrap(crown, pointTop, bTop, cx + fx * half, Math.max(0.5, S * 0.015), S * 0.06 * emblem, gold);
-    fillRect(crown, cx + fx * half - S * 0.02, pointTop - S * 0.04, cx + fx * half + S * 0.02, pointTop, gem);
+// The crown she holds up in the app icon: a small standalone emblem on a 10×8 canvas (the 1px
+// margin all round leaves outline() somewhere to draw). Deliberately NOT paintLogo() — that one is
+// sized for a 16×24 sprite cell and would dwarf her hand.
+function paintHandCrown() {
+  const c = newImg(10, 8);
+  fillRect(c, 1, 4, 9, 7, GOLD); // band
+  fillRect(c, 1, 6, 9, 7, GOLD_DARK); // shaded lower rim
+  for (const cx of [2, 5, 8]) {
+    fillTrap(c, 2, 4, cx, 0.5, 1.2, GOLD); // three points
+    pset(c, cx, 1, GEM); // jewel on each tip
   }
-  fillRect(crown, cx - S * 0.025, (bTop + bBot) / 2 - S * 0.025, cx + S * 0.025, (bTop + bBot) / 2 + S * 0.025, gem);
-  outline(crown, OUT);
-  blit(img, crown, 0, 0);
+  pset(c, 5, 5, GEM); // centre stone on the band
+  outline(c, OUT);
+  return c;
+}
+
+// The icon's subject: the heroine dressed as the Principessa Perfetta — the same 16×24 body and
+// the same wearable layers the game paints, composed in the game's own layer order, in the
+// "celebrate" pose (both arms up). No head crown: the crown is the thing she's HOLDING, and one
+// gold focal point reads far better at 48px than two.
+function paintPrincessFigure() {
+  const p = pose({ armsUp: true });
+  const fig = newImg(BODY_W, BODY_H);
+  blit(fig, paintHeroine(HEROINES[0].look, p), 0, 0); // Anna — the default heroine
+  const wear = (kind) => {
+    const layer = SKIN_LAYERS.find((s) => s.kind === kind);
+    blit(fig, paintSkin(kind, layer.color, p), 0, 0);
+  };
+  ["skirt", "bodice", "necklace", "gloves", "cape"].forEach(wear); // game order, minus the crown
+  return fig;
+}
+
+/**
+ * App icon (PWA / apple-touch-icon): the pixel princess raising the gold crown, on the gift's
+ * sugar-paper blue. Fully opaque — iOS composites black behind transparent icons.
+ *
+ * Everything is derived from (S, u) so the same composition serves both variants:
+ *   • paintAppIcon(64, 2)  → the "any" icons (upscaled ×8 → 512, ×3 → 192 / apple-touch)
+ *   • paintAppIcon(128, 3) → the MASKABLE one (upscaled ×4 → 512). A bigger canvas around the same
+ *     figure is how we shrink her relative to the frame without fractional scaling (the pixel
+ *     toolkit only does integer upscales): at 128/×3 the whole subject sits inside Android's
+ *     safe zone, so no crop shape can clip her head or her feet.
+ *
+ * @param {number} S  native canvas size (must divide the target PNG sizes exactly)
+ * @param {number} u  integer upscale for the 16×24 figure inside that canvas
+ */
+export function paintAppIcon(S, u = 2) {
+  const img = newImg(S, S);
+  // Deep blue — the app's theme_color/background_color, and the one backdrop her sugar-paper-blue
+  // jacket reads against. (On the old pale-blue field her raised ARMS were the same colour as the
+  // background and vanished: the crown appeared to float, held by nobody.)
+  fillRect(img, 0, 0, S, S, [38, 50, 92]);
+
+  // Place the figure so the whole subject — raised crown included — is centred. The crown hangs off
+  // her right hand, so the body itself sits a little left of centre to balance it.
+  const fx = Math.round(S / 2 - 12.5 * u);
+  const fy = Math.round(S / 2 - 11 * u);
+  const groundY = fy + 22 * u; // the band meets her ankles, so she's standing ON it, not above it
+  fillRect(img, 0, groundY, S, S, [199, 186, 232]); // lilac ground band
+
+  // A few sparkles in the empty upper-left, drawn before the figure so she stays on top.
+  for (const [sx, sy, r] of [[0.16, 0.16, 1], [0.26, 0.3, 0.6], [0.1, 0.36, 0.6], [0.84, 0.66, 0.8]]) {
+    fillRect(img, S * sx - r * u, S * sy - r * u, S * sx + r * u, S * sy + r * u, [255, 248, 240], 210);
+  }
+
+  blit(img, upscale(paintPrincessFigure(), u), fx, fy);
+
+  // The crown, held up in her raised right hand (body-native (12,5) — see the anatomy contract).
+  // Its 10×8 canvas is planted so the band lands beside the hand and the points rise clear of her
+  // hair. It starts one native pixel PAST the arm (13, not 12): sitting right on it, the crown hid
+  // the raised hand and the glove, and looked like it was floating unheld.
+  blit(img, upscale(paintHandCrown(), u), fx + 13 * u, fy - 2 * u);
   return img;
 }
 
