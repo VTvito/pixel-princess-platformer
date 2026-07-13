@@ -28,6 +28,13 @@
 // Legacy rows: the pre-rewrite entries are bare nicknames with no "<id>:" prefix. parseMember()
 // handles both shapes, so the existing board keeps rendering instead of being wiped.
 //
+// Moderation — because rows accumulate and nicknames are player-supplied, there has to be a way to
+// take one down (an offensive name, a bogus time, a test row):
+//   DELETE /api/leaderboard {id} | {member}   header: x-admin-token: <ADMIN_TOKEN>
+//        -> { ok: true, removed, ...page }
+// It FAILS CLOSED: with no ADMIN_TOKEN env var set, the endpoint answers 404 as if it didn't exist,
+// so an unconfigured deploy can't be scraped for a delete route. The compare is timing-safe.
+//
 // Provision the store in the Vercel dashboard (Storage -> Marketplace -> Redis) and link it to
 // this project; it injects the credentials as env vars. We read either the Upstash-native names
 // or the legacy KV ones so it keeps working across integration versions. Without them the
@@ -39,10 +46,21 @@ const KEY_SEQ = "pj:lb:seq"; // counter: hands out a unique id per submitted run
 const REST_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
 const REST_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
 
+const ADMIN_TOKEN = process.env.LB_ADMIN_TOKEN || ""; // unset → DELETE doesn't exist (fails closed)
+
 const MAX_TIME_MS = 24 * 60 * 60 * 1000; // 24h upper bound — reject nonsense / overflow times
 const MAX_ROWS = 200; // how many runs the board remembers (the rest is trimmed away)
 const DEFAULT_LIMIT = 10; // one page
 const MAX_LIMIT = 50; // cap a caller-supplied page size
+
+// Constant-time secret compare — a plain `===` leaks the token's prefix through response timing.
+const { timingSafeEqual } = require("node:crypto");
+function tokenOk(given) {
+  if (!ADMIN_TOKEN || typeof given !== "string") return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(ADMIN_TOKEN);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 // Send one Redis command as a JSON array to the REST root (avoids URL-encoding the member).
 async function redis(command) {
@@ -173,6 +191,43 @@ module.exports = async (req, res) => {
       const offset = idx === null ? 0 : Math.floor(idx / limit) * limit;
       const body2 = await page(offset, limit);
       res.status(200).json({ ok: true, id, rank: idx === null ? null : idx + 1, ...body2 });
+      return;
+    }
+    if (req.method === "DELETE") {
+      // Fail closed: an unconfigured deploy must look like it has no delete route at all.
+      if (!ADMIN_TOKEN || !tokenOk(req.headers["x-admin-token"])) {
+        res.status(404).json({ error: "non trovato" });
+        return;
+      }
+      let body = req.body;
+      if (typeof body === "string") {
+        try {
+          body = JSON.parse(body);
+        } catch {
+          body = {};
+        }
+      }
+      body = body || {};
+
+      // Address a row either by its run id (what the board shows) or by the exact member string —
+      // the latter is the only way to reach a LEGACY row, which has no id.
+      let member = typeof body.member === "string" ? body.member : "";
+      if (!member && body.id != null) {
+        const id = Math.floor(Number(body.id));
+        if (!Number.isFinite(id)) {
+          res.status(400).json({ error: "id non valido" });
+          return;
+        }
+        const all = (await redis(["ZRANGE", KEY_TIME, "0", "-1"])) || [];
+        member = all.find((m) => parseMember(m).id === id) || "";
+      }
+      if (!member) {
+        res.status(404).json({ error: "riga non trovata" });
+        return;
+      }
+      const removed = Number(await redis(["ZREM", KEY_TIME, member])) || 0;
+      await redis(["HDEL", KEY_SCORE, member]); // never leave an orphan score behind
+      res.status(200).json({ ok: true, removed, ...(await page(0, DEFAULT_LIMIT)) });
       return;
     }
     res.status(405).json({ error: "metodo non consentito" });

@@ -123,6 +123,10 @@ npm run deploy               # prod deploy to Vercel (VERCEL_TOKEN from the giti
   `ZREMRANGEBYRANK`), and paged (`?offset=&limit=`, global `rank` per row).
 - **The UI highlights by row `id`, never by nickname** — a name would light up every row that player
   ever set — and `lastSentRunKey` stops one run being filed twice.
+- **Moderation:** `DELETE /api/leaderboard` with `x-admin-token: $LB_ADMIN_TOKEN` removes a row by
+  `{id}` (or `{member}` for a legacy row). It **fails closed** — with no `LB_ADMIN_TOKEN` set it
+  answers 404 as if the route didn't exist. Use it for an offensive nickname, a bogus time, or a
+  test row; there is no other way to take an entry down.
 - **The finale's closing order is CLASSIFICA → SCONTRINO.** The leaderboard invitation is the gate
   (submit or the small "Salta"); its `onDone` then chains the receipt. Reversed, players closed the
   app on the receipt and never saw the board at all. The DOM overlay swallows clicks but **not
@@ -148,6 +152,8 @@ npm run deploy               # prod deploy to Vercel (VERCEL_TOKEN from the giti
 - The leaderboard store is **Upstash Redis via the Vercel Marketplace**, injecting
   `UPSTASH_REDIS_REST_URL` / `_TOKEN` (the function also accepts the legacy `KV_REST_API_*` names).
   Unset → 503 → the leaderboard hides and the game still ships. Vercel env vars, never committed.
+- **`LB_ADMIN_TOKEN`** (Vercel env var + the local `.env`) is the secret for `DELETE
+  /api/leaderboard`. Unset → the route 404s. Never commit or echo it.
 
 ## Conventions
 - **Detailed top-of-file header comments explaining the "why"**, generous inline comments at decision
